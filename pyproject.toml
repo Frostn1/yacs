@@ -5,9 +5,12 @@ description = "YACS - Yet Another CVE Searcher"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "cpe-utils>=0.1.0",
     "loguru>=0.7.3",
     "orjson>=3.10.15",
+    "packaging>=24.2",
     "pymongo>=4.11.1",
+    "python-dateutil>=2.9.0.post0",
     "pytz>=2025.1",
     "requests>=2.32.3",
     "ruff>=0.9.6",

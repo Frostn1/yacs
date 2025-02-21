@@ -1,4 +1,9 @@
 #!/usr/bin/python
+from typing import Iterable
+from loguru import logger
+from pymongo.collection import Collection
+from src.utils import greater_version, normalize_app_name
+
 
 import pymongo
 import logging
@@ -7,85 +12,25 @@ from os import environ as env
 import json
 import re
 
-# Set up logging
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-s_handler = logging.StreamHandler()
-s_handler.setFormatter(formatter)
-logger.addHandler(s_handler)
-
-"""
-Simply connect to MongoDB
-* Requires environment variables to be set which specifies the URI to connect to MongoDB and the password
-"""
-
-
-def connect_mdb() -> pymongo.MongoClient:
-    try:
-        conn = pymongo.MongoClient("localhost:27017")
-        logger.info("Connected to MongoDB Atlas!")
-    except Exception as e:
-        logger.error("Unable to get a connection to the MongoDB database: {}".format(e))
-        exit(1)
-    return conn
-
-
-"""
-Checks to see which version is greater
-"""
-
-
-def greater_version(source, target):
-    # First extend the version
-    source = str(source)
-    target = str(target)
-    pattern = r"\D+"
-    s = re.split(pattern, source)
-    t = re.split(pattern, target)
-    s = [int(_) if _ else 0 for _ in s]
-    t = [int(_) if _ else 0 for _ in t]
-    if len(s) > len(t):
-        t.extend([0] * (len(s) - len(t)))
-    else:
-        s.extend([0] * (len(t) - len(s)))
-    for i in range(0, len(s)):
-        if s[i] > t[i]:
-            return source
-        elif t[i] > s[i]:
-            return target
-    # Default
-    return source
 
 
 # Finds all CVEs that reference this CPE
 # BULK VERSION: def find_all_cves(conn, application, versions, debug=False):
-def find_all_cves(conn, application, versions, debug=False):
-    db = conn["nvd_mirror"]
-    coll = db["cves"]
-
-    def normalize_app_name(application):
-        output = ""
-        for letter in application:
-            if letter in "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~":
-                output += f".?{letter}.?"
-            else:
-                output += letter
-        output = output.lower().replace(" ", ".{0,3}")
-        output = output.replace("*", ".")
-        return output
-
-    normalized_app = normalize_app_name(application)
+def find_cves(cves_collection: Collection, app_name: str, versions: list[str]):
+    normalized_app_name = normalize_app_name(app_name)
     # First, we get all CVEs that reference this application
     query = {
         "cve.description.description_data": {
             "$elemMatch": {
-                "value": {"$regex": f"(\s|^){normalized_app}(\s|$)", "$options": "si"}
+                "value": {
+                    "$regex": f"(\s|^){normalized_app_name}(\s|$)",
+                    "$options": "si",
+                }
             }
         }
     }
 
-    logger.debug(f"Application to look up: {application}")
+    logger.debug(f"Application to look up: {app_name}")
     logger.debug(f"Query: {json.dumps(query)}")
 
     def is_app_in_cpe_uri(normalized_app, uri):
@@ -110,7 +55,7 @@ def find_all_cves(conn, application, versions, debug=False):
         # This is another validity metric which asks if the CPE URI helps us determine the version validity
         if cpe_match["vulnerable"]:
             cpe_uri = cpe_match["cpe23Uri"]
-            if is_app_in_cpe_uri(normalized_app, cpe_uri):
+            if is_app_in_cpe_uri(normalized_app_name, cpe_uri):
                 # This is a validity metric where we simply look for the application in the CPE URI as a string
                 logger.debug(f"[{cve_id}] - Application in CPE URI. +confidence")
                 confidences["app in cpe_uri"] = True
@@ -331,7 +276,7 @@ def find_all_cves(conn, application, versions, debug=False):
     valid_cves = dict()
 
     def gen_valid_cves(cves, versions):
-        logger.info(f"Evaluating {application} with version(s) {', '.join(versions)}")
+        logger.info(f"Evaluating {app_name} with version(s) {', '.join(versions)}")
         for version in versions:
             valid_cves[version] = dict()
         for cve in cves:
@@ -343,7 +288,7 @@ def find_all_cves(conn, application, versions, debug=False):
                 f"Description: {cve['cve']['description']['description_data'][0]['value']}"
             )
             for version in versions:
-                logger.debug(f"Evaluating {application} CVEs for version {version}")
+                logger.debug(f"Evaluating {app_name} CVEs for version {version}")
                 for node in nodes:
                     for child in node["children"]:
                         cpe_matches = child["cpe_match"]
@@ -354,7 +299,7 @@ def find_all_cves(conn, application, versions, debug=False):
                             ):
                                 logger.debug(f"CPE: {cpe_match}")
                                 if is_valid_cve(
-                                    application,
+                                    app_name,
                                     version,
                                     cve["cve"]["CVE_data_meta"]["ID"],
                                     cve["cve"]["description"]["description_data"][0][
@@ -363,7 +308,7 @@ def find_all_cves(conn, application, versions, debug=False):
                                     cpe_match,
                                 ):
                                     logger.info(
-                                        f"Valid CVE for {application} {version}: {cve['cve']['CVE_data_meta']['ID']}"
+                                        f"Valid CVE for {app_name} {version}: {cve['cve']['CVE_data_meta']['ID']}"
                                     )
                                     valid_cves[version][
                                         cve["cve"]["CVE_data_meta"]["ID"]
@@ -379,7 +324,7 @@ def find_all_cves(conn, application, versions, debug=False):
                         if cve["cve"]["CVE_data_meta"]["ID"] not in valid_cves.keys():
                             logger.debug(f"CPE: {cpe_match}")
                             if is_valid_cve(
-                                application,
+                                app_name,
                                 version,
                                 cve["cve"]["CVE_data_meta"]["ID"],
                                 cve["cve"]["description"]["description_data"][0][
@@ -388,7 +333,7 @@ def find_all_cves(conn, application, versions, debug=False):
                                 cpe_match,
                             ):
                                 logger.info(
-                                    f"Valid CVE for {application} {version}: {cve['cve']['CVE_data_meta']['ID']}"
+                                    f"Valid CVE for {app_name} {version}: {cve['cve']['CVE_data_meta']['ID']}"
                                 )
                                 valid_cves[version][
                                     cve["cve"]["CVE_data_meta"]["ID"]
@@ -399,10 +344,10 @@ def find_all_cves(conn, application, versions, debug=False):
                                     f"Invalid CVE: {cve['cve']['CVE_data_meta']['ID']}"
                                 )
 
-    cve_count = coll.count_documents(query)
+    cve_count = cves_collection.count_documents(query)
     logger.debug(f"MongoDB returned {cve_count} documents for the query")
     # Load the CVEs into a list so we don't have to use a cursor due to 10 minute timeouts
-    cves = [_ for _ in coll.find(query)]
+    cves = [_ for _ in cves_collection.find(query)]
     gen_valid_cves(cves, versions)
     return valid_cves
 
