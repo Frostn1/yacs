@@ -1,0 +1,15 @@
+[project]
+name = "yacs"
+version = "0.1.0"
+description = "YACS - Yet Another CVE Searcher"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "loguru>=0.7.3",
+    "orjson>=3.10.15",
+    "pymongo>=4.11.1",
+    "pytz>=2025.1",
+    "requests>=2.32.3",
+    "ruff>=0.9.6",
+    "tool>=0.8.0",
+]
