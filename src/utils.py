@@ -1,6 +1,6 @@
 from dataclasses import dataclass
-from typing import Callable, Optional
-from packaging.version import Version
+from typing import Callable, Iterable, Optional
+from packaging.version import Version, InvalidVersion
 from cpe_utils import CPE
 
 APPNAME_ESCAPES_MAP: dict[str, str] = {
@@ -9,16 +9,76 @@ APPNAME_ESCAPES_MAP: dict[str, str] = {
     "*": ".",
 }
 
+MIN_VERSION_RAW = "0"
+MAX_VERSION_RAW = "1000000000"
+
+MIN_VERSION = Version(MIN_VERSION_RAW)
+MAX_VERSION = Version(MAX_VERSION_RAW)
+CPE_WILDCARD = "*"
+CPE_VERSION_FILLER = "-"
+
 
 @dataclass
 class Confidence:
-    description: str
-    is_legitimate: bool
-    _validation_function: Callable[[dict, str, Version], bool]
+    description: str = ""
+    _validation_function: Callable[[dict, str, Version], bool] = (
+        lambda _, __, ___: False
+    )
+    is_legitimate: bool = False
 
     def is_confident(self, cve: dict, app_name: str, version: Version) -> bool:
         self.is_legitimate = self._validation_function(cve, app_name, version)
         return self.is_legitimate
+
+
+def is_version(value: str) -> bool:
+    try:
+        Version(value)
+        return True
+    except InvalidVersion:
+        return False
+
+
+class CPEMatch:
+    def __init__(
+        self,
+        vulnerable: bool = False,
+        cpe23Uri: str = "",
+        versionStartIncluding: str = MIN_VERSION_RAW,
+        versionStartExcluding: str = MIN_VERSION_RAW,
+        versionEndIncluding: str = MAX_VERSION_RAW,
+        versionEndExcluding: str = MAX_VERSION_RAW,
+        cpe_name: list = None,
+    ) -> None:
+        self.vulnerable: bool = vulnerable
+        self.cpe23Uri: CPE = CPE(cpe23Uri)
+        self.versionStartIncluding: Version = Version(versionStartIncluding) if is_version(self.cpe23Uri.version) else MIN_VERSION
+        self.versionStartExcluding: Version = Version(versionStartExcluding) if is_version(self.cpe23Uri.version) else MIN_VERSION
+        self.versionEndIncluding: Version = Version(versionEndIncluding) if is_version(self.cpe23Uri.version) else MAX_VERSION
+        self.versionEndExcluding: Version = Version(versionEndExcluding) if is_version(self.cpe23Uri.version) else MAX_VERSION
+        self.cpe_name: list = cpe_name if cpe_name else []
+
+        self.min_version = (
+            Version(self.cpe23Uri.version)
+            if is_version(self.cpe23Uri.version)
+            else MIN_VERSION
+        )
+        self.max_version = (
+            Version(self.cpe23Uri.version)
+            if is_version(self.cpe23Uri.version)
+            else MAX_VERSION
+        )
+
+        self.min_version = max(
+            self.min_version, self.versionStartIncluding, self.versionStartExcluding
+        )
+        self.max_version = min(
+            self.max_version, self.versionEndExcluding, self.versionEndIncluding
+        )
+
+    # TODO Fix to support including and excluding range
+    def is_inrange(self, version: Version) -> bool:
+        return self.min_version <= version <= self.max_version
 
 
 def greater_version(*versions: str) -> str:
@@ -57,19 +117,21 @@ def normalize_app_name(app_name: str) -> str:
     return out
 
 
-def extract_cpe_uri_from_cve(cve: dict) -> Optional[CPE]:
+def extract_cpe_from_cve(cve: dict) -> Iterable[CPEMatch]:
     """
     Extracts CPE URI from CVE
 
     Args:
         cve (dict): CVE to extract CPE URI from
 
-    Returns:
-        Optional[CPE]: CPE URI
+    Yields:
+        CPE: CPE URI
     """
     for node in cve["configurations"]["nodes"]:
+        print("node:", node)
         for cpe_match in node.get("cpe_match", []):
-            return CPE(cpe_match["cpe23Uri"])
+            print("cpe_match:", cpe_match)
+            yield CPEMatch(**cpe_match)
     return None
 
 
