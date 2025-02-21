@@ -1,4 +1,3 @@
-from dataclasses import dataclass
 from datetime import datetime
 
 LAST_MODIFIED_DATE_FORMAT = "%Y-%m-%dT%H:%M:%S%z"

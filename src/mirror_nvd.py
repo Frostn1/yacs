@@ -1,29 +1,20 @@
 #!/usr/bin/python
 from collections import deque
-import enum
+from datetime import datetime
 from loguru import logger
 from pymongo.collection import Collection
+from pytz import UTC
 from requests import get
 from typing import Iterable
 from io import BytesIO
 from gzip import GzipFile
 from orjson import loads as orjson_loads
-from src.mdb_client import UPDATE_OPERATIONS_MAP, MongoDBClient, UpdateOperation
+from src.mdb_client import UPDATE_OPERATIONS_MAP, UpdateOperation
 from src.nvd_structs import MetaFile
 
 
-import pymongo
-import argparse
-from os import environ as env
-from datetime import datetime
-import pytz
-import requests
-import gzip
-import io
-import json
-
-
 NVD_MIN_YEAR = 2002
+NVD_MAX_YEAR = datetime.today().year
 NVD_METAFILES_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.meta"
 NVD_CVES_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.json.gz"
 
@@ -45,7 +36,6 @@ def _fetch_metafile(year: int = NVD_MIN_YEAR) -> MetaFile:
     return MetaFile(**metadata)
 
 
-# Download specific CVE year
 def _fetch_cves(year: int = NVD_MIN_YEAR) -> Iterable[dict]:
     """
     Fetches CVEs for a specific year from NVD
@@ -64,7 +54,6 @@ def _fetch_cves(year: int = NVD_MIN_YEAR) -> Iterable[dict]:
     response = get(url=url, timeout=60, stream=True)
     with GzipFile(fileobj=BytesIO(response.content)) as f:
         yield from orjson_loads(f.read())["CVE_Items"]
-    logger.error(f"Failed fetching CVEs - {year}")
 
 
 def fetch_metafiles(
@@ -119,11 +108,15 @@ def fetch_cve_years_need_of_update(
         (year, metafile)
         for year, metafile in fetch_metafiles()
         if year not in checkpoints.keys()
-        or metafile.lastModifiedDate > pytz.UTC.localize(checkpoints[year])
+        or metafile.lastModifiedDate > UTC.localize(checkpoints[year])
     )
 
 
-def update_checkpoints(meta_collection: Collection) -> None:
+def update_checkpoints(
+    meta_collection: Collection,
+    min_year: int = NVD_MIN_YEAR,
+    max_year: int = NVD_MAX_YEAR,
+) -> None:
     """
     Update checkpoints for meta files
 
@@ -136,23 +129,46 @@ def update_checkpoints(meta_collection: Collection) -> None:
             {"$set": vars(metafile) | {"feed": year}},
             upsert=True,
         )
-        for year, metafile in fetch_metafiles()
-        if logger.info(f"Updateing checkpoint - {year}") or True
+        for year, metafile in fetch_metafiles(min_year, max_year)
+        if logger.info(f"Updating checkpoint - {year}") or True
+    )
+
+
+def update_cves_by_years(
+    cvs_collection: Collection,
+    years: Iterable[int],
+    operation: UpdateOperation = UpdateOperation.SYNC,
+) -> None:
+    """
+    Update CVEs by years
+
+    Args:
+        cvs_collection (Collection): Collection to update CVEs in
+        years (Iterable[int]): Years to update
+        operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
+    """
+    deque(
+        UPDATE_OPERATIONS_MAP.get(operation)(cvs_collection, _fetch_cves(year))
+        for year in years
+        if logger.info(f"Updating CVEs - {year}") or True
     )
 
 
 def update_cves(
-    cvs_collection: Collection, operation: UpdateOperation = UpdateOperation.SYNC
+    cvs_collection: Collection,
+    meta_collection: Collection,
+    operation: UpdateOperation = UpdateOperation.SYNC,
 ) -> None:
     """
     Update all CVEs
 
     Args:
         cvs_collection (Collection): Collection to update CVEs in
-        operation (UpdateOperation, optional): Operation to perform on DB9. Defaults to UpdateOperation.SYNC.
+        meta_collection (Collection): Collection to update metas in
+        operation (UpdateOperation, optional): Operation to perform on DB. Defaults to UpdateOperation.SYNC.
     """
-    deque(
-        UPDATE_OPERATIONS_MAP.get(operation)(cvs_collection, _fetch_cves(year))
-        for year, _ in fetch_cve_years_need_of_update()
-        if logger.info(f"Updating CVEs - {year}") or True
+    update_cves_by_years(
+        cvs_collection,
+        (year for year, _ in fetch_cve_years_need_of_update(meta_collection)),
+        operation,
     )

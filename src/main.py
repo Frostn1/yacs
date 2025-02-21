@@ -1,13 +1,21 @@
-from src.mdb_client import MongoDBClient
-from src.mirror_nvd import update_checkpoints, update_cves
+from datetime import datetime
+from src.mdb_client import MongoDBClient, UpdateOperation
+from src.mirror_nvd import (
+    get_checkpoints,
+    update_checkpoints,
+    update_cves,
+    update_cves_by_years,
+)
 
 
 def main() -> None:
+    start = datetime.now()
     with MongoDBClient() as mdb_client:
-        meta_collection = mdb_client["nvd"]["meta"]
-        cve_collection = mdb_client["nvd"]["cves"]
-        update_checkpoints(meta_collection)
-        update_cves(cve_collection)
+        meta_collection = mdb_client["my_nvd_mirror"]["meta"]
+        cve_collection = mdb_client["my_nvd_mirror"]["cves"]
+        update_cves_by_years(cve_collection, range(2002, 2026), UpdateOperation.INITIAL)
+    end = datetime.now()
+    print(f"Time taken: {end - start}s")
 
 
 if __name__ == "__main__":

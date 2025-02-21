@@ -23,9 +23,6 @@ def MongoDBClient(
         conn = MongoClient(connection_str)
         logger.info("Connected to MongoDB")
         yield conn
-    except Exception as e:
-        logger.error("Unable to connect to MongoDB: {}".format(e))
-        exit(1)
     finally:
         conn.close()
 
@@ -39,7 +36,7 @@ def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
         )
         for cve in cves
     )
-    result = cves_collection.bulk_write(replacments)
+    result = cves_collection.bulk_write(list(replacments))
     logger.info(f"Finished synching - {result.bulk_api_result}")
 
 
@@ -51,8 +48,8 @@ def _initial_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
 UPDATE_OPERATIONS_MAP: dict[
     UpdateOperation, Callable[[Collection, Iterable[dict]], None]
 ] = {
-    UpdateOperation.SYNC,
+    UpdateOperation.SYNC:
     _sync_cves,
-    UpdateOperation.INITIAL,
+    UpdateOperation.INITIAL:
     _initial_cves,
 }
