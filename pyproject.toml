@@ -9,6 +9,7 @@ dependencies = [
     "loguru>=0.7.3",
     "orjson>=3.10.15",
     "packaging>=24.2",
+    "pydantic>=2.10.6",
     "pymongo>=4.11.1",
     "python-dateutil>=2.9.0.post0",
     "pytz>=2025.1",
