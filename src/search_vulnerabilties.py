@@ -242,7 +242,7 @@ def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
 def search_vulnerabilities(
     cves_collection: Collection,
     queries: list[CVEQuery],
-    threshhold: float = 0.75,
+    threshhold: float = 0.6,
 ) -> Iterable[tuple[CVEQuery, Iterable[CVEMatch]]]:
     """
     Search for vulnerabilities in versions listed and using NVD mirror DB
