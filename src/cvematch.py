@@ -12,12 +12,19 @@ class CVEMatch:
     query: CVEQuery
     confidences: list[Confidence]
     score: Optional[float] = None
+    raw_confidences: Optional[list[bool]] = None
 
     @property
     def confidence_score(self) -> float:
         if self.score is None:
-            self.score = fmean(
+            self.score = fmean(self.get_raw_confidences)
+        return self.score
+
+    @property
+    def get_raw_confidences(self) -> list[bool]:
+        if self.raw_confidences is None:
+            self.raw_confidences = [
                 confidence.is_confident(self.cve, self.query)
                 for confidence in self.confidences
-            )
-        return self.score
+            ]
+        return self.raw_confidences

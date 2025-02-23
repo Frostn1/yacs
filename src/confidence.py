@@ -9,7 +9,6 @@ from src.cvequery import CVEQuery
 class Confidence:
     description: str = ""
     _validation_function: Callable[[dict, CVEQuery], bool] = lambda _, __, ___: False
-    is_legitimate: bool = False
 
     def is_confident(self, cve: dict, query: CVEQuery) -> bool:
         logger.debug(

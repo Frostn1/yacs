@@ -30,24 +30,25 @@ class CPEMatch:
     ) -> None:
         self.vulnerable: bool = vulnerable
         self.cpe23Uri: CPE = CPE(cpe23Uri)
+
         self.versionStartIncluding: Version = (
             Version(versionStartIncluding)
-            if is_version(self.cpe23Uri.version)
+            if is_version(versionStartIncluding)
             else MIN_VERSION
         )
         self.versionStartExcluding: Version = (
             Version(versionStartExcluding)
-            if is_version(self.cpe23Uri.version)
+            if is_version(versionStartExcluding)
             else MIN_VERSION
         )
         self.versionEndIncluding: Version = (
             Version(versionEndIncluding)
-            if is_version(self.cpe23Uri.version)
+            if is_version(versionEndIncluding)
             else MAX_VERSION
         )
         self.versionEndExcluding: Version = (
             Version(versionEndExcluding)
-            if is_version(self.cpe23Uri.version)
+            if is_version(versionEndExcluding)
             else MAX_VERSION
         )
         self.cpe_name: list = cpe_name if cpe_name else []
@@ -77,3 +78,6 @@ class CPEMatch:
             and self.max_version != MAX_VERSION
             and self.min_version <= version <= self.max_version
         )
+
+    def __repr__(self):
+        return f"{self.max_version = } {self.min_version = }"

@@ -23,16 +23,44 @@ CHARS_TO_STRIP = "!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"
 VERSION_PREFIX = "vx"
 
 
-def get_cves_by_app_name(cves_collection: Collection, app_name: str) -> Iterable[dict]:
+def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[dict]:
     query = {
-        "cve.description.description_data": {
-            "$elemMatch": {
-                "value": {
-                    "$regex": f"(\s|^){normalize_app_name(app_name)}(\s|$)",
-                    "$options": "si",
+        "$or": [
+            {
+                "cve.description.description_data": {
+                    "$elemMatch": {
+                        "value": {
+                            "$regex": f"(\s|^){normalize_app_name(query.product)}(\s|$)",
+                            "$options": "si",
+                        }
+                    }
                 }
-            }
-        }
+            },
+            {
+                "configurations.nodes": {
+                    "$elemMatch": {
+                        "cpe_match": {
+                            "$elemMatch": {
+                                "$or": [
+                                    {
+                                        "cpe23Uri": {
+                                            "$regex": f"^cpe:2\.3:\w:[^:]+:{query.product}:",
+                                            "$options": "i",
+                                        }
+                                    },
+                                    {
+                                        "cpe23Uri": {
+                                            "$regex": f"^cpe:2\.3:\w:{query.vendor}:",
+                                            "$options": "i",
+                                        }
+                                    },
+                                ]
+                            }
+                        }
+                    }
+                }
+            },
+        ],
     }
     count = cves_collection.count_documents(query)
     logger.debug(f"Query - {count} documents")
@@ -50,10 +78,14 @@ def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Is version in CPE vulnerable version range
     """
+    if cve["cve"]["CVE_data_meta"]["ID"] == "CVE-2023-44487":
+        print("HELLO THERE")
+        for cpe in extract_cpe_from_cve(cve):
+            print(f"{cpe = } {cpe.is_inrange(query.version) = }")
     return any(cpe.is_inrange(query.version) for cpe in extract_cpe_from_cve(cve))
 
 
-def _validate_app_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
+def _validate_product_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     """
     Validate application name is contained in cpe
 
@@ -66,9 +98,7 @@ def _validate_app_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     """
     return any(
         map(
-            lambda cpe: is_application_name_in_cpe(
-                query.product, cpe.cpe23Uri
-            ),
+            lambda cpe: is_application_name_in_cpe(query.product, cpe.cpe23Uri),
             extract_cpe_from_cve(cve),
         )
     )
@@ -217,6 +247,13 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
     return False
 
 
+def _validate_product_in_summary(cve: dict, query: CVEQuery) -> bool:
+    return (
+        bool(query.product)
+        and query.product in cve["cve"]["description"]["description_data"][0]["value"]
+    )
+
+
 def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
     """
     Checks if CVE is legitimate for version,
@@ -229,8 +266,8 @@ def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
         bool: is CVE legitimate
     """
     confidence: list[Confidence] = [
-        Confidence("Application name contained in summary", lambda _, __: True),
-        Confidence("Application name contained in CPE URI", _validate_app_name_in_cpe),
+        Confidence("Product name contained in summary", _validate_product_in_summary),
+        Confidence("Product name contained in CPE URI", _validate_product_name_in_cpe),
         Confidence("Vendor name contained in CPE URI", _validate_vendor_name_in_cpe),
         Confidence("Version is in CPE Version Range", _validate_cpe_version),
         Confidence("Version is in Summary", _validate_version_in_summary),
@@ -263,7 +300,7 @@ def search_vulnerabilities(
                 lambda cvematch: cvematch.confidence_score >= threshhold,
                 (
                     is_legitimate_cve(cve, query)
-                    for cve in get_cves_by_app_name(cves_collection, query.product)
+                    for cve in get_cves_by_query(cves_collection, query)
                 ),
             ),
         )
@@ -276,14 +313,14 @@ def main() -> None:
     logger.add(sys.stderr, level="INFO")
     with MongoDBClient() as mdb_client:
         cve_collection = mdb_client["my_nvd_mirror"]["cves"]
-        query = CVEQuery("", "nginx", Version("1.18.0"))
+        query = CVEQuery("f5", "nginx", Version("1.18.0"))
         for query, cves in search_vulnerabilities(cve_collection, [query]):
             cves = list(cves)
             print(f"Query - {query} , Found {len(cves)} cves")
 
             for cvematch in cves:
                 logger.info(
-                    f"Found CVE [Confidence {cvematch.confidence_score}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
+                    f"Found CVE [Confidence {cvematch.get_raw_confidences}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
                 )
 
 

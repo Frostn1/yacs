@@ -312,7 +312,7 @@ def find_all_cves(conn, application, versions, debug=False):
             logger.debug(
                 f"[{cve_id}] - Did not do CPE version evaluation due to invulnerable CPE or application not in CPE URI. -confidence"
             )
-            confidences["app in cpe_uri"] = False
+            confidences["cpe_version_eval"] = False
 
         # Turn confidence dictionary into confidence score (out of 100)
         confidence = (
