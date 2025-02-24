@@ -55,8 +55,8 @@ async def _fetch_cves(year: int = NVD_MIN_YEAR) -> AsyncIterable[dict]:
     logger.info(f"Fetching CVEs - {url}")
     response = get(url=url, timeout=60, stream=True)
     async with ClientSession() as session:
-        async with session.get(url=url, timeout=60, stream=True) as response:
-            async with GzipFile(fileobj=BytesIO(response.content)) as f:
+        async with session.get(url=url, timeout=60) as response:
+            async with GzipFile(fileobj=BytesIO(await response.content.read())) as f:
                 async for v in orjson_loads(f.read())["CVE_Items"]:
                     yield v
 
@@ -130,7 +130,7 @@ async def update_checkpoints(
     Args:
         async_meta_collection (Async Collection): Collection to update metas in
     """
-    deque(
+    [
         await async_meta_collection.update_one(
             {"type": "cve checkpoint", "feed": year},
             {"$set": vars(metafile) | {"feed": year}},
@@ -138,7 +138,7 @@ async def update_checkpoints(
         )
         async for year, metafile in await fetch_metafiles(min_year, max_year)
         if logger.info(f"Updating checkpoint - {year}") or True
-    )
+    ]
 
 
 async def update_cves_by_years(
@@ -154,13 +154,13 @@ async def update_cves_by_years(
         years (Iterable[int]): Years to update
         operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
     """
-    deque(
+    [
         await UPDATE_OPERATIONS_MAP.get(operation)(
             async_cve_collection, _fetch_cves(year)
         )
         for year in years
         if logger.info(f"Updating CVEs - {year}") or True
-    )
+    ]
 
 
 async def update_cves(

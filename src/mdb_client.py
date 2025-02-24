@@ -1,6 +1,6 @@
 import contextlib
 import enum
-from typing import Callable, Generator, Iterable
+from typing import AsyncIterable, Callable, Generator, Iterable
 
 from loguru import logger
 from pymongo import MongoClient
@@ -27,26 +27,26 @@ def MongoDBClient(
         conn.close()
 
 
-async def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
-    replacments = (
+async def _sync_cves(cves_collection: Collection, cves: AsyncIterable[dict]) -> None:
+    replacments = [
         ReplaceOne(
             filter={"cve.CVE_data_meta.ID": cve["cve"]["CVE_data_meta"]["ID"]},
             replacement=cve,
             upsert=True,
         )
         for cve in cves
-    )
-    result = await cves_collection.bulk_write(list(replacments))
+    ]
+    result = await cves_collection.bulk_write(replacments)
     logger.info(f"Finished synching - {result.bulk_api_result}")
 
 
-async def _initial_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
-    await cves_collection.insert_many(cves)
+async def _initial_cves(cves_collection: Collection, cves: AsyncIterable[dict]) -> None:
+    await cves_collection.insert_many([cve async for cve in cves])
     logger.info("Finished initial insertion")
 
 
 UPDATE_OPERATIONS_MAP: dict[
-    UpdateOperation, Callable[[Collection, Iterable[dict]], None]
+    UpdateOperation, Callable[[Collection, AsyncIterable[dict]], None]
 ] = {
     UpdateOperation.SYNC: _sync_cves,
     UpdateOperation.INITIAL: _initial_cves,

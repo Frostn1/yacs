@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pymongo import AsyncMongoClient
 from src.mdb_client import MongoDBClient, UpdateOperation
-from src.mirror_nvd import (
+from src.async_mirror_nvd import (
     get_checkpoints,
     update_checkpoints,
     update_cves,
