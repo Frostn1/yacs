@@ -1,3 +1,4 @@
+import asyncio
 from itertools import chain
 from re import Match, I as Insensitive, M as Multiline, findall, search
 import sys
@@ -6,13 +7,14 @@ from loguru import logger
 from pymongo.collection import Collection
 from packaging.version import Version
 from src.confidence import Confidence
-from src.cpematch import is_version
+from src.cpematch import CPEMatch, is_version
 from src.cvematch import CVEMatch
 from src.cvequery import CVEQuery
 from src.mdb_client import MongoDBClient
 from src.utils import (
+    async_any,
     extract_cpe_from_cve,
-    is_application_name_in_cpe,
+    is_product_name_in_cpe,
     is_vendor_name_in_cpe,
     normalize_app_name,
 )
@@ -23,7 +25,9 @@ CHARS_TO_STRIP = "!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"
 VERSION_PREFIX = "vx"
 
 
-def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[dict]:
+async def get_cves_by_query(
+    cves_collection: Collection, query: CVEQuery
+) -> Iterable[dict]:
     query = {
         "$or": [
             {
@@ -67,7 +71,7 @@ def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[
     return (doc for doc in cves_collection.find(query))
 
 
-def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
+async def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
     """
     Validate version is in vulnerable cpe version range
 
@@ -78,14 +82,10 @@ def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Is version in CPE vulnerable version range
     """
-    if cve["cve"]["CVE_data_meta"]["ID"] == "CVE-2023-44487":
-        print("HELLO THERE")
-        for cpe in extract_cpe_from_cve(cve):
-            print(f"{cpe = } {cpe.is_inrange(query.version) = }")
-    return any(cpe.is_inrange(query.version) for cpe in extract_cpe_from_cve(cve))
+    return await async_any(cpe.is_inrange(query.version) for cpe in extract_cpe_from_cve(cve))
 
 
-def _validate_product_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
+async def _validate_product_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     """
     Validate application name is contained in cpe
 
@@ -96,15 +96,14 @@ def _validate_product_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Whether or not app name is in CPE
     """
-    return any(
-        map(
-            lambda cpe: is_application_name_in_cpe(query.product, cpe.cpe23Uri),
-            extract_cpe_from_cve(cve),
-        )
+
+    return await async_any(
+        await is_product_name_in_cpe(query.product, cpe.cpe23Uri)
+        async for cpe in extract_cpe_from_cve(cve)
     )
 
 
-def _validate_vendor_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
+async def _validate_vendor_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     """
     Validate vendor name is contained in cpe
 
@@ -115,15 +114,14 @@ def _validate_vendor_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Whether or not vendor name is in CPE
     """
-    return any(
-        map(
-            lambda cpe: is_vendor_name_in_cpe(query.vendor, cpe.cpe23Uri),
-            extract_cpe_from_cve(cve),
-        )
+
+    return await async_any(
+        await is_vendor_name_in_cpe(query.vendor, cpe.cpe23Uri)
+        async for cpe in extract_cpe_from_cve(cve)
     )
 
 
-def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
+async def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
     """
     Extracts all version referenced in regex match
 
@@ -156,7 +154,9 @@ def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
     return tuple(set(Version(version) for version in versions if is_version(version)))
 
 
-def _is_version_in_between(found_versions: list[Version], version: Version) -> bool:
+async def _is_version_in_between(
+    found_versions: list[Version], version: Version
+) -> bool:
     """
     Validate if version is between max and min version in `found_versions`
 
@@ -174,7 +174,7 @@ def _is_version_in_between(found_versions: list[Version], version: Version) -> b
     return min_version <= version <= max_version
 
 
-def _is_version_before(found_versions: list[Version], version: Version) -> bool:
+async def _is_version_before(found_versions: list[Version], version: Version) -> bool:
     """
     Checks if version is before any version in `found_versions`
 
@@ -188,7 +188,7 @@ def _is_version_before(found_versions: list[Version], version: Version) -> bool:
     return any(version < found_version for found_version in found_versions)
 
 
-def _is_version_after(found_versions: list[Version], version: Version) -> bool:
+async def _is_version_after(found_versions: list[Version], version: Version) -> bool:
     """
     Checks if version is after any version in `found_versions`
 
@@ -202,7 +202,9 @@ def _is_version_after(found_versions: list[Version], version: Version) -> bool:
     return any(version > found_version for found_version in found_versions)
 
 
-def _is_version_in_versions(found_versions: list[Version], version: Version) -> bool:
+async def _is_version_in_versions(
+    found_versions: list[Version], version: Version
+) -> bool:
     """
     Checks if version is after any version in `found_versions`
 
@@ -216,7 +218,7 @@ def _is_version_in_versions(found_versions: list[Version], version: Version) -> 
     return version in found_versions
 
 
-def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
+async def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
     """_summary_
 
     Args:
@@ -247,14 +249,14 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
     return False
 
 
-def _validate_product_in_summary(cve: dict, query: CVEQuery) -> bool:
+async def _validate_product_in_summary(cve: dict, query: CVEQuery) -> bool:
     return (
         bool(query.product)
         and query.product in cve["cve"]["description"]["description_data"][0]["value"]
     )
 
 
-def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
+async def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
     """
     Checks if CVE is legitimate for version,
 
@@ -276,7 +278,7 @@ def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
     return CVEMatch(cve, query, confidence)
 
 
-def search_vulnerabilities(
+async def search_vulnerabilities(
     cves_collection: Collection,
     queries: list[CVEQuery],
     threshhold: float = 0.6,
@@ -296,33 +298,39 @@ def search_vulnerabilities(
     return (
         (
             query,
-            filter(
-                lambda cvematch: cvematch.confidence_score >= threshhold,
-                (
-                    is_legitimate_cve(cve, query)
-                    for cve in get_cves_by_query(cves_collection, query)
-                ),
+            (
+                cvematch
+                async for cvematch in (
+                    await is_legitimate_cve(cve, query)
+                    for cve in await get_cves_by_query(cves_collection, query)
+                )
+                if await cvematch.confidence_score >= threshhold
             ),
         )
         for query in queries
     )
 
 
-def main() -> None:
+async def main() -> None:
     logger.remove()
     logger.add(sys.stderr, level="INFO")
     with MongoDBClient() as mdb_client:
         cve_collection = mdb_client["my_nvd_mirror"]["cves"]
         query = CVEQuery("f5", "nginx", Version("1.18.0"))
-        for query, cves in search_vulnerabilities(cve_collection, [query]):
-            cves = list(cves)
-            print(f"Query - {query} , Found {len(cves)} cves")
+        async for query, cves in await search_vulnerabilities(cve_collection, [query]):
+            # cves = list(cves)
+            # print(f"Query - {query} , Found {len(cves)} cves")
 
-            for cvematch in cves:
+            async for cvematch in cves:
                 logger.info(
-                    f"Found CVE [Confidence {cvematch.get_raw_confidences}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
+                    f"Found CVE [Confidence {await cvematch.get_raw_confidences}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
                 )
 
 
+async def execute():
+    async with asyncio.TaskGroup() as group:
+        group.create_task(main())
+
+
 if __name__ == "__main__":
-    main()
+    asyncio.run(execute())

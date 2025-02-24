@@ -15,16 +15,19 @@ class CVEMatch:
     raw_confidences: Optional[list[bool]] = None
 
     @property
-    def confidence_score(self) -> float:
+    async def confidence_score(self) -> float:
         if self.score is None:
-            self.score = fmean(self.get_raw_confidences)
+            c = await self.get_raw_confidences
+            print(f"{c = }")
+            print(f"{[await i for i in c ] = }")
+            self.score = fmean(await self.get_raw_confidences)
         return self.score
 
     @property
-    def get_raw_confidences(self) -> list[bool]:
+    async def get_raw_confidences(self) -> list[bool]:
         if self.raw_confidences is None:
             self.raw_confidences = [
-                confidence.is_confident(self.cve, self.query)
+                await confidence.is_confident(self.cve, self.query)
                 for confidence in self.confidences
             ]
         return self.raw_confidences

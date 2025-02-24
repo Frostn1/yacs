@@ -1,4 +1,4 @@
-from typing import Iterable, Optional
+from typing import Any, AsyncGenerator, AsyncIterable, Iterable, Optional
 from packaging.version import Version
 from cpe_utils import CPE
 
@@ -51,7 +51,7 @@ def normalize_app_name(app_name: str) -> str:
     return out
 
 
-def extract_cpe_from_cve(cve: dict) -> Iterable[CPEMatch]:
+async def extract_cpe_from_cve(cve: dict) -> AsyncIterable[CPEMatch]:
     """
     Extracts CPE URI from CVE
 
@@ -64,12 +64,18 @@ def extract_cpe_from_cve(cve: dict) -> Iterable[CPEMatch]:
     for node in cve["configurations"]["nodes"]:
         for cpe_match in node.get("cpe_match", []):
             yield CPEMatch(**cpe_match)
-    return None
 
 
-def is_application_name_in_cpe(application_name: str, cpe: Optional[CPE]) -> bool:
+async def is_product_name_in_cpe(application_name: str, cpe: Optional[CPE]) -> bool:
     return bool(cpe) and application_name == cpe.product
 
 
 def is_vendor_name_in_cpe(vendor_name: str, cpe: Optional[CPE]) -> bool:
     return (bool(cpe) and vendor_name == cpe.vendor) or not bool(vendor_name)
+
+
+async def async_any(async_iterable: AsyncIterable[object]) -> bool:
+    async for element in async_iterable:
+        if element:
+            return True
+    return False
