@@ -49,7 +49,7 @@ async def _fetch_cves(year: int = NVD_MIN_YEAR) -> AsyncIterable[dict]:
         Iterable[dict]: Iterable of all CVEs for said year
 
     Yields:
-        Iterator[Iterable[dict]]: Iterable of all CVEs for said year
+        AsyncIterable[Iterable[dict]]: Iterable of all CVEs for said year
     """
     url = NVD_CVES_URL.format(year=year)
     logger.info(f"Fetching CVEs - {url}")
@@ -61,9 +61,9 @@ async def _fetch_cves(year: int = NVD_MIN_YEAR) -> AsyncIterable[dict]:
                     yield v
 
 
-def fetch_metafiles(
+async def fetch_metafiles(
     min_year: int = NVD_MIN_YEAR, max_year: int = datetime.today().year
-) -> Iterable[tuple[int, MetaFile]]:
+) -> AsyncIterable[tuple[int, MetaFile]]:
     """
     Fetch metafiles for a range of years from NVD
 
@@ -72,23 +72,25 @@ def fetch_metafiles(
         max_year (int, optional): End year to fetch for, inclusive. Defaults to datetime.today().year.
 
     Returns:
-        Iterable[tuple[int, MetaFile]]: Iterable of tuples, year and meta file for said year
+        AsyncIterable[tuple[int, MetaFile]]: Iterable of tuples, year and meta file for said year
     """
-    return ((year, _fetch_metafile(year)) for year in range(min_year, max_year + 1))
+    return (
+        (year, await _fetch_metafile(year)) for year in range(min_year, max_year + 1)
+    )
 
 
 # TODO Look over adding a custom class for checkpoint
-def get_checkpoints(meta_collection: Collection) -> dict[int, datetime]:
+async def get_checkpoints(async_meta_collection: Collection) -> dict[int, datetime]:
     """
     Gets checkpoints for CVEs, i.e. to know when to update the cves DB
 
     Args:
-        collection (Collection): Collection, usually under meta, that holds CVE checkpoints
+        async_meta_collection (Async Collection): Collection, usually under meta, that holds CVE checkpoints
 
     Returns:
         dict[int, datetime]: CVE Checkpoints
     """
-    checkpoints = meta_collection.find(
+    checkpoints = await async_meta_collection.find(
         {"type": "cve checkpoint"}, {"feed": 1, "lastModifiedDate": 1}
     )
     return {
@@ -96,29 +98,29 @@ def get_checkpoints(meta_collection: Collection) -> dict[int, datetime]:
     }
 
 
-def fetch_cve_years_need_of_update(
-    meta_collection: Collection,
-) -> Iterable[tuple[int, MetaFile]]:
+async def fetch_cve_years_need_of_update(
+    async_meta_collection: Collection,
+) -> AsyncIterable[tuple[int, MetaFile]]:
     """
     Fetches CVE years that need to be updated
 
     Args:
-        collection (Collection): Collection, usually under meta, that holds CVE checkpoints
+        async_meta_collection (Async Collection): Collection, usually under meta, that holds CVE checkpoints
 
     Returns:
         Iterable[tuple[int, MetaFile]]: Iterable of tuples, year and meta file for said year
     """
-    checkpoints = get_checkpoints(meta_collection)
+    checkpoints = await get_checkpoints(async_meta_collection)
     return (
         (year, metafile)
-        for year, metafile in fetch_metafiles()
+        async for year, metafile in await fetch_metafiles()
         if year not in checkpoints.keys()
         or metafile.lastModifiedDate > UTC.localize(checkpoints[year])
     )
 
 
-def update_checkpoints(
-    meta_collection: Collection,
+async def update_checkpoints(
+    async_meta_collection: Collection,
     min_year: int = NVD_MIN_YEAR,
     max_year: int = NVD_MAX_YEAR,
 ) -> None:
@@ -126,21 +128,21 @@ def update_checkpoints(
     Update checkpoints for meta files
 
     Args:
-        meta_collection (Collection): Collection to update metas in
+        async_meta_collection (Async Collection): Collection to update metas in
     """
     deque(
-        meta_collection.update_one(
+        await async_meta_collection.update_one(
             {"type": "cve checkpoint", "feed": year},
             {"$set": vars(metafile) | {"feed": year}},
             upsert=True,
         )
-        for year, metafile in fetch_metafiles(min_year, max_year)
+        async for year, metafile in await fetch_metafiles(min_year, max_year)
         if logger.info(f"Updating checkpoint - {year}") or True
     )
 
 
-def update_cves_by_years(
-    cvs_collection: Collection,
+async def update_cves_by_years(
+    async_cve_collection: Collection,
     years: Iterable[int],
     operation: UpdateOperation = UpdateOperation.SYNC,
 ) -> None:
@@ -148,19 +150,21 @@ def update_cves_by_years(
     Update CVEs by years
 
     Args:
-        cvs_collection (Collection): Collection to update CVEs in
+        async_cve_collection (Async Collection): Collection to update CVEs in
         years (Iterable[int]): Years to update
         operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
     """
     deque(
-        UPDATE_OPERATIONS_MAP.get(operation)(cvs_collection, _fetch_cves(year))
+        await UPDATE_OPERATIONS_MAP.get(operation)(
+            async_cve_collection, _fetch_cves(year)
+        )
         for year in years
         if logger.info(f"Updating CVEs - {year}") or True
     )
 
 
-def update_cves(
-    cvs_collection: Collection,
+async def update_cves(
+    async_cve_collection: Collection,
     meta_collection: Collection,
     operation: UpdateOperation = UpdateOperation.SYNC,
 ) -> None:
@@ -168,12 +172,15 @@ def update_cves(
     Update all CVEs
 
     Args:
-        cvs_collection (Collection): Collection to update CVEs in
+        async_cve_collection (Async Collection): Collection to update CVEs in
         meta_collection (Collection): Collection to update metas in
         operation (UpdateOperation, optional): Operation to perform on DB. Defaults to UpdateOperation.SYNC.
     """
-    update_cves_by_years(
-        cvs_collection,
-        (year for year, _ in fetch_cve_years_need_of_update(meta_collection)),
+    await update_cves_by_years(
+        async_cve_collection,
+        (
+            year
+            async for year, _ in await fetch_cve_years_need_of_update(meta_collection)
+        ),
         operation,
     )

@@ -27,7 +27,7 @@ def MongoDBClient(
         conn.close()
 
 
-def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
+async def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
     replacments = (
         ReplaceOne(
             filter={"cve.CVE_data_meta.ID": cve["cve"]["CVE_data_meta"]["ID"]},
@@ -36,20 +36,18 @@ def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
         )
         for cve in cves
     )
-    result = cves_collection.bulk_write(list(replacments))
+    result = await cves_collection.bulk_write(list(replacments))
     logger.info(f"Finished synching - {result.bulk_api_result}")
 
 
-def _initial_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
-    cves_collection.insert_many(cves)
+async def _initial_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
+    await cves_collection.insert_many(cves)
     logger.info("Finished initial insertion")
 
 
 UPDATE_OPERATIONS_MAP: dict[
     UpdateOperation, Callable[[Collection, Iterable[dict]], None]
 ] = {
-    UpdateOperation.SYNC:
-    _sync_cves,
-    UpdateOperation.INITIAL:
-    _initial_cves,
+    UpdateOperation.SYNC: _sync_cves,
+    UpdateOperation.INITIAL: _initial_cves,
 }
