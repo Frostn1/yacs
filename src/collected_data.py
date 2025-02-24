@@ -1,10 +1,13 @@
 from dataclasses import dataclass
 
-import pymongo
+from packaging import Version
+from src.cvequery import CVEQuery
 
 
 class Telemetry:
-    def find_vulns(client: pymongo.MongoClient) -> list[dict]:
+    
+    @property
+    def query(self) -> CVEQuery:
         raise NotImplementedError
 
 
@@ -14,10 +17,11 @@ class OsVersion(Telemetry):
     version: str
     build: str
 
-    def find_vulns(self, client: pymongo.MongoClient) -> list[dict]:
+    @property
+    def query(self) -> CVEQuery:
         vendor = "microsoft"
-        product = "_".join(self.version.split()[:2]).lower()
-        vendor_query = {"cve.CVE_data_meta.ASSIGNER": {"$regex": vendor}}
+        product = "_".join([*self.os.split()[:2], self.version]).lower()
+        return CVEQuery(vendor, product, Version(self.build))
 
 
 @dataclass
