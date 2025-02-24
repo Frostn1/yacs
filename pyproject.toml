@@ -5,6 +5,7 @@ description = "YACS - Yet Another CVE Searcher"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "aiohttp[speedups]>=3.11.12",
     "cpe-utils>=0.1.0",
     "loguru>=0.7.3",
     "orjson>=3.10.15",
