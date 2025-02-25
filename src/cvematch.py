@@ -27,4 +27,6 @@ class CVEMatch:
                 confidence.is_confident(self.cve, self.query)
                 for confidence in self.confidences
             ]
+            if self.cve['cve']['CVE_data_meta']['ID'] == "CVE-2025-21420":
+                breakpoint()
         return self.raw_confidences

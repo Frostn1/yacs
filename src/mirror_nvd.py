@@ -1,6 +1,7 @@
 #!/usr/bin/python
 from collections import deque
 from datetime import datetime
+from threading import Thread
 from loguru import logger
 from pymongo.collection import Collection
 from pytz import UTC
@@ -134,8 +135,23 @@ def update_checkpoints(
     )
 
 
+def _update_cves_by_year(
+    cve_collection: Collection,
+    year: int,
+    operation: UpdateOperation = UpdateOperation.SYNC,
+) -> None:
+    """_summary_
+
+    Args:
+        cve_collection (Collection): _description_
+        year (int): _description_
+        operation (UpdateOperation, optional): _description_. Defaults to UpdateOperation.SYNC.
+    """
+    UPDATE_OPERATIONS_MAP.get(operation)(cve_collection, _fetch_cves(year))
+
+
 def update_cves_by_years(
-    cvs_collection: Collection,
+    cve_collection: Collection,
     years: Iterable[int],
     operation: UpdateOperation = UpdateOperation.SYNC,
 ) -> None:
@@ -143,15 +159,18 @@ def update_cves_by_years(
     Update CVEs by years
 
     Args:
-        cvs_collection (Collection): Collection to update CVEs in
+        cve_collection (Collection): Collection to update CVEs in
         years (Iterable[int]): Years to update
         operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
     """
-    deque(
-        UPDATE_OPERATIONS_MAP.get(operation)(cvs_collection, _fetch_cves(year))
+    update_ts = [
+        Thread(target=_update_cves_by_year, args=(cve_collection, year, operation))
         for year in years
         if logger.info(f"Updating CVEs - {year}") or True
-    )
+    ]
+
+    deque(t.start() for t in update_ts)
+    deque(t.join() for t in update_ts)
 
 
 def update_cves(

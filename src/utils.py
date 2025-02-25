@@ -5,7 +5,7 @@ from cpe_utils import CPE
 from src.cpematch import CPEMatch
 
 APPNAME_ESCAPES_MAP: dict[str, str] = {
-    "!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~": ".?{char}.?",
+    r"!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~": ".?{char}.?",
     " ": ".{0,3}",
     "*": ".",
 }
@@ -28,12 +28,12 @@ def greater_version(*versions: Version) -> str:
     return max(versions)
 
 
-def normalize_app_name(app_name: str) -> str:
+def normalize_product(product: str) -> str:
     """
     Normalize app name for search, using APPNAME_ESCAPES_MAP
 
     Args:
-        app_name (str): App name to normalize
+        app_productname (str): Product name to normalize
 
     Returns:
         str: Normalized app name
@@ -41,7 +41,7 @@ def normalize_app_name(app_name: str) -> str:
 
     out: str = ""
 
-    for char in app_name:
+    for char in product:
         for key in APPNAME_ESCAPES_MAP:
             if char in key:
                 char = APPNAME_ESCAPES_MAP[key].format(char=char)

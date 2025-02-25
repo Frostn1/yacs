@@ -14,12 +14,11 @@ from src.utils import (
     extract_cpe_from_cve,
     is_application_name_in_cpe,
     is_vendor_name_in_cpe,
-    normalize_app_name,
 )
 
 
 GENERIC_VERSION_REGEX = r"v?\d\S*"
-CHARS_TO_STRIP = "!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"
+CHARS_TO_STRIP = r"!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"
 VERSION_PREFIX = "vx"
 
 
@@ -30,7 +29,7 @@ def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[
                 "cve.description.description_data": {
                     "$elemMatch": {
                         "value": {
-                            "$regex": f"(\s|^){normalize_app_name(query.product)}(\s|$)",
+                            "$regex": rf"(\s|^){query.product}(\s|$)",
                             "$options": "si",
                         }
                     }
@@ -44,14 +43,14 @@ def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[
                                 "$or": [
                                     {
                                         "cpe23Uri": {
-                                            "$regex": f"^cpe:2\.3:\w:[^:]+:{query.product}:",
-                                            "$options": "i",
+                                            "$regex": rf"^cpe:2\.3:\w:[^:]+:{query.product}:",
+                                            "$options": "is",
                                         }
                                     },
                                     {
                                         "cpe23Uri": {
-                                            "$regex": f"^cpe:2\.3:\w:{query.vendor}:",
-                                            "$options": "i",
+                                            "$regex": rf"^cpe:2\.3:\w:{query.vendor}:",
+                                            "$options": "is",
                                         }
                                     },
                                 ]
@@ -63,6 +62,7 @@ def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[
         ],
     }
     count = cves_collection.count_documents(query)
+    logger.debug(f"Query - {query}")
     logger.debug(f"Query - {count} documents")
     return (doc for doc in cves_collection.find(query))
 
@@ -78,10 +78,6 @@ def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Is version in CPE vulnerable version range
     """
-    if cve["cve"]["CVE_data_meta"]["ID"] == "CVE-2023-44487":
-        print("HELLO THERE")
-        for cpe in extract_cpe_from_cve(cve):
-            print(f"{cpe = } {cpe.is_inrange(query.version) = }")
     return any(cpe.is_inrange(query.version) for cpe in extract_cpe_from_cve(cve))
 
 
@@ -229,13 +225,13 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
     description = cve["cve"]["description"]["description_data"][0]["value"]
     regexes: dict[str, Callable[[list[Version], Version], bool]] = {
         # Between versions
-        "((v?\d\S*?)(\sthrough\s)(v?\d\S*?)(\s|$))|((version|versions)\s(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(between\s(version\s|versions\s)?(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(before\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?after\s(version\s|versions\s)?(v?\d\S*?)(\s|$))|(after\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?before\s(version\s|versions\s)?(v?\d\S*?)(\s|$))": _is_version_in_between,
+        r"((v?\d\S*?)(\sthrough\s)(v?\d\S*?)(\s|$))|((version|versions)\s(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(between\s(version\s|versions\s)?(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(before\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?after\s(version\s|versions\s)?(v?\d\S*?)(\s|$))|(after\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?before\s(version\s|versions\s)?(v?\d\S*?)(\s|$))": _is_version_in_between,
         # Before versions
-        "(((versions\s)?(?!v?\d\S*?)(prior(\sto)?|before|below|through)\s(versions\s)?)(v?\d\S*?)(,(\s(and\s)?(v?\d\S*))+))|((((version\s|versions\s)?(?!v?\d\S*?)(prior(\sto)?|before|below|through)\s(version\s|versions\s)?)|(<(=)?\s+?))(v?\d\S*?)(\s|$)(?!and\safter))|(version|versions)?(\s(v?\d\S*?)\s(\()?and\s(below|prior|before|earlier)(\))?)": _is_version_before,
+        r"(((versions\s)?(?!v?\d\S*?)(prior(\sto)?|before|below|through)\s(versions\s)?)(v?\d\S*?)(,(\s(and\s)?(v?\d\S*))+))|((((version\s|versions\s)?(?!v?\d\S*?)(prior(\sto)?|before|below|through)\s(version\s|versions\s)?)|(<(=)?\s+?))(v?\d\S*?)(\s|$)(?!and\safter))|(version|versions)?(\s(v?\d\S*?)\s(\()?and\s(below|prior|before|earlier)(\))?)": _is_version_before,
         # # After versions
-        "(?!and)\s((((after)\s(version\s|versions\s)?)|(>(=)?\s+?))(v?\d\S*?)(\s|$)(?!and))|(\s(v?\d\S?)\s(\()and\s(after|later)(\)))": _is_version_after,
+        r"(?!and)\s((((after)\s(version\s|versions\s)?)|(>(=)?\s+?))(v?\d\S*?)(\s|$)(?!and))|(\s(v?\d\S?)\s(\()and\s(after|later)(\)))": _is_version_after,
         # # Raw versions
-        "(\s(version\s)?(v?\d\S*?)(\s|$)(?!and))": _is_version_in_versions,
+        r"(\s(version\s)?(v?\d\S*?)(\s|$)(?!and))": _is_version_in_versions,
     }
     for regex, validate_function in regexes.items():
         versions = _extract_versions_from_regex(
@@ -279,7 +275,7 @@ def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
 def search_vulnerabilities(
     cves_collection: Collection,
     queries: list[CVEQuery],
-    threshhold: float = 0.7,
+    threshhold: float = 0.6,
 ) -> Iterable[tuple[CVEQuery, Iterable[CVEMatch]]]:
     """
     Search for vulnerabilities in versions listed and using NVD mirror DB
@@ -313,7 +309,7 @@ def main() -> None:
     logger.add(sys.stderr, level="INFO")
     with MongoDBClient() as mdb_client:
         cve_collection = mdb_client["my_nvd_mirror"]["cves"]
-        query = CVEQuery("f5", "nginx", Version("1.18.0"))
+        query = CVEQuery("microsoft", "windows_11_23h2", Version("10.0.26100"), False)
         for query, cves in search_vulnerabilities(cve_collection, [query]):
             cves = list(cves)
             print(f"Query - {query} , Found {len(cves)} cves")
