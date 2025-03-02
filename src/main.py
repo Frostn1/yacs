@@ -13,7 +13,8 @@ def main() -> None:
     with MongoDBClient() as mdb_client:
         meta_collection = mdb_client["nvd_mirror"]["meta"]
         cve_collection = mdb_client["nvd_mirror"]["cves"]
-        update_cves_by_years(cve_collection, range(2002, 2026), UpdateOperation.INITIAL)
+        update_checkpoints(meta_collection)
+        # update_cves_by_years(cve_collection, range(2002, 2026), UpdateOperation.INITIAL)
     end = datetime.now()
     print(f"Time taken: {end - start}s")
 

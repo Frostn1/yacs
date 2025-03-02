@@ -1,7 +1,7 @@
 #!/usr/bin/python
+from tqdm import tqdm
 from collections import deque
 from datetime import datetime
-from threading import Thread
 from loguru import logger
 from pymongo.collection import Collection
 from pytz import UTC
@@ -18,6 +18,8 @@ NVD_MIN_YEAR = 2002
 NVD_MAX_YEAR = datetime.today().year
 NVD_METAFILES_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.meta"
 NVD_CVES_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.json.gz"
+logger.remove()
+logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True, level="INFO")
 
 
 def _fetch_metafile(year: int = NVD_MIN_YEAR) -> MetaFile:
@@ -124,7 +126,7 @@ def update_checkpoints(
     Args:
         meta_collection (Collection): Collection to update metas in
     """
-    deque(
+    deque(tqdm(
         meta_collection.update_one(
             {"type": "cve checkpoint", "feed": year},
             {"$set": vars(metafile) | {"feed": year}},
@@ -132,7 +134,7 @@ def update_checkpoints(
         )
         for year, metafile in fetch_metafiles(min_year, max_year)
         if logger.info(f"Updating checkpoint - {year}") or True
-    )
+    ))
 
 
 def _update_cves_by_year(
@@ -163,14 +165,11 @@ def update_cves_by_years(
         years (Iterable[int]): Years to update
         operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
     """
-    update_ts = [
-        Thread(target=_update_cves_by_year, args=(cve_collection, year, operation))
+    deque(tqdm(
+        _update_cves_by_year(cve_collection, year, operation)
         for year in years
         if logger.info(f"Updating CVEs - {year}") or True
-    ]
-
-    deque(t.start() for t in update_ts)
-    deque(t.join() for t in update_ts)
+    ))
 
 
 def update_cves(
