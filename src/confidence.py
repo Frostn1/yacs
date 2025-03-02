@@ -9,10 +9,11 @@ from src.cvequery import CVEQuery
 class Confidence:
     description: str = ""
     _validation_function: Callable[[dict, CVEQuery], bool] = lambda _, __, ___: False
+    weight: float = .1
 
-    def is_confident(self, cve: dict, query: CVEQuery) -> bool:
+    def confidence_value(self, cve: dict, query: CVEQuery) -> float:
         logger.debug(
             f"Validating {self.description} - {cve['cve']['CVE_data_meta']['ID']}"
         )
         self.is_legitimate = self._validation_function(cve, query)
-        return self.is_legitimate
+        return self.is_legitimate * self.weight
