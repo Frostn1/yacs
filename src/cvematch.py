@@ -17,7 +17,9 @@ class CVEMatch:
     @property
     def confidence_score(self) -> float:
         if self.score is None:
-            self.score = min(max(fmean(self.get_raw_confidences), sum(self.get_raw_confidences)), 1)
+            self.score = min(
+                max(fmean(self.get_raw_confidences), sum(self.get_raw_confidences)), 1
+            )
         return self.score
 
     @property
@@ -27,6 +29,4 @@ class CVEMatch:
                 confidence.confidence_value(self.cve, self.query)
                 for confidence in self.confidences
             ]
-            if self.cve['cve']['CVE_data_meta']['ID'] == "CVE-2025-21420":
-                breakpoint()
         return self.raw_confidences

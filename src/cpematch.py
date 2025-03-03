@@ -74,8 +74,7 @@ class CPEMatch:
     # TODO Fix to support including and excluding range
     def is_inrange(self, version: Version) -> bool:
         return (
-            self.min_version != MIN_VERSION
-            and self.max_version != MAX_VERSION
+            self.max_version != MAX_VERSION
             and self.min_version <= version <= self.max_version
         )
 
