@@ -18,6 +18,9 @@ class Confidence:
         logger.debug(
             f"Validating {self.description} - {cve['cve']['CVE_data_meta']['ID']}"
         )
+        if cve['cve']['CVE_data_meta']['ID'] == 'CVE-2023-36404':
+            breakpoint()
+
         self.is_legitimate = self._validation_function(cve, query)
         return self.is_legitimate * sum(
             chain(

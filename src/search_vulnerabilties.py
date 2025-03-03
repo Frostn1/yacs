@@ -282,9 +282,9 @@ def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
 
 def search_vulnerabilities(
     cves_collection: Collection,
-    queries: list[CVEQuery],
+    query: CVEQuery,
     threshhold: float = 0.6,
-) -> Iterable[tuple[CVEQuery, Iterable[CVEMatch]]]:
+) -> tuple[CVEQuery, Iterable[CVEMatch]]:
     """
     Search for vulnerabilities in versions listed and using NVD mirror DB
 
@@ -297,18 +297,12 @@ def search_vulnerabilities(
         Iterable[CVEQuery, Iterable[tuple[float, dict]]]: Iterable of tuples, Query and Iterable of CVEMatches for that query
     """
 
-    return (
+    return query, filter(
+        lambda cvematch: cvematch.confidence_score >= threshhold,
         (
-            query,
-            filter(
-                lambda cvematch: cvematch.confidence_score >= threshhold,
-                (
-                    is_legitimate_cve(cve, query)
-                    for cve in get_cves_by_query(cves_collection, query)
-                ),
-            ),
-        )
-        for query in queries
+            is_legitimate_cve(cve, query)
+            for cve in get_cves_by_query(cves_collection, query)
+        ),
     )
 
 
@@ -317,7 +311,9 @@ def main() -> None:
     logger.add(sys.stderr, level="INFO")
     with MongoDBClient() as mdb_client:
         cve_collection = mdb_client["nvd_mirror"]["cves"]
-        query = CVEQuery("microsoft", "windows_11_24h2", Version("10.0.26100.1742"), False)
+        query = CVEQuery(
+            "microsoft", "windows_11_24h2", Version("10.0.26100.1742"), False
+        )
         for query, cves in search_vulnerabilities(cve_collection, [query]):
             cves = list(cves)
             print(f"Query - {query} , Found {len(cves)} cves")
