@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 import re
 import sys
+import time
 from typing import Iterable
 from loguru import logger
 from packaging.version import Version
@@ -71,17 +72,29 @@ def main() -> None:
     logger.remove()
     logger.add(sys.stderr, level="INFO")
     with MongoDBClient() as mdb_client:
-        cve_collection = mdb_client["my_nvd_mirror"]["cves"]
+        cve_collection = mdb_client["nvd_mirror"]["cves"]
+        # cve_collection.create_index({ "cve.description.description_data.value_text": "text" })
+        # cve_collection.create_index({ "configurations.nodes.cpe_match.cpe23Uri": 1 })
+        # cve_collection.create_index([("cve.CVE_data_meta.ID", 1)])
+
         cd = CollectedData(
             # OsVersion("Windows 11 Pro", "23H2", "10.0.22631.4751"),
             OsVersion("Windows 11 Pro", "24H2", "10.0.26100.3194"),
             [InstalledApplication("CrystalDiskMark 8.0.6", "8.0.6")],
         )
-        query = CVEQuery("f5", "nginx", Version('1.18.0'))
-        with catchtime.catchtime() as timer:
-            cves = list(get_cves_by_query(cve_collection, query))
-            print(cves, len(cves))
+        query = CVEQuery("f5", "nginx", Version("1.18.0"))
+        # query = OsVersion("Windows 11 Pro", "24H2", "10.0.26100.3194").query
+        # with catchtime.catchtime():
+        start = time.time()
+            # result = get_cves_by_query(cve_collection, query)
+            # print(result)
+        cves = list(get_cves_by_query(cve_collection, query))
+        print(type(cves), len(cves))
+        end = time.time()
+        print(f'Time: {end - start} seconds')
+
         return
+
         _, cd.os_version.cves = search_vulnerabilities(
             cve_collection, cd.os_version.query
         )

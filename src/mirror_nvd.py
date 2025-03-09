@@ -190,3 +190,6 @@ def update_cves(
         (year for year, _ in fetch_cve_years_need_of_update(meta_collection)),
         operation,
     )
+
+# def setup_db():
+#     db.cves.createIndex({ "cve.description.description_data.value_text": "text" })
