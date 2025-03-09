@@ -25,40 +25,36 @@ VERSION_PREFIX = "vx"
 def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[dict]:
     query = {
         "$or": [
+            {
+                "cve.description.description_data.value_text": {
+                    "$regex": rf"(\s|^){query.product}(\s|$)",
+                    "$options": "si",
+                }
+            },
             # {
-            #     "cve.description.description_data": {
+            #     "configurations.nodes": {
             #         "$elemMatch": {
-            #             "value": {
-            #                 "$regex": rf"(\s|^){query.product}(\s|$)",
-            #                 "$options": "si",
+            #             "cpe_match": {
+            #                 "$elemMatch": {
+            #                     "$or": [
+            #                         {
+            #                             "cpe23Uri": {
+            #                                 "$regex": rf"^cpe:2\.3:\w:[^:]+:{query.product}:",
+            #                                 "$options": "is",
+            #                             }
+            #                         },
+            #                         # {
+            #                         #     "cpe23Uri": {
+            #                         #         "$regex": rf"^cpe:2\.3:\w:{query.vendor}:",
+            #                         #         "$options": "is",
+            #                         #     }
+            #                         # },
+            #                     ]
+            #                 }
             #             }
             #         }
             #     }
             # },
-            {
-                "configurations.nodes": {
-                    "$elemMatch": {
-                        "cpe_match": {
-                            "$elemMatch": {
-                                "$or": [
-                                    {
-                                        "cpe23Uri": {
-                                            "$regex": rf"^cpe:2\.3:\w:[^:]+:{query.product}:",
-                                            "$options": "is",
-                                        }
-                                    },
-                                    {
-                                        "cpe23Uri": {
-                                            "$regex": rf"^cpe:2\.3:\w:{query.vendor}:",
-                                            "$options": "is",
-                                        }
-                                    },
-                                ]
-                            }
-                        }
-                    }
-                }
-            },
         ],
     }
     count = cves_collection.count_documents(query)
