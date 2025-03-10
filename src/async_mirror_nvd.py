@@ -56,9 +56,12 @@ async def _fetch_cves(year: int = NVD_MIN_YEAR) -> AsyncIterable[dict]:
     response = get(url=url, timeout=60, stream=True)
     async with ClientSession() as session:
         async with session.get(url=url, timeout=60) as response:
-            async with GzipFile(fileobj=BytesIO(await response.content.read())) as f:
-                async for v in orjson_loads(f.read())["CVE_Items"]:
-                    yield v
+            f = GzipFile(fileobj=BytesIO(await response.content.read()))
+            for v in orjson_loads(f.read())["CVE_Items"]:
+                yield v
+            f.close()
+            # async with GzipFile(fileobj=BytesIO(await response.content.read())) as f:
+                
 
 
 async def fetch_metafiles(
