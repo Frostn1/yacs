@@ -83,11 +83,9 @@ def main() -> None:
             [InstalledApplication("CrystalDiskMark 8.0.6", "8.0.6")],
         )
         query = CVEQuery("f5", "nginx", Version("1.18.0"))
-        # query = OsVersion("Windows 11 Pro", "24H2", "10.0.26100.3194").query
-        # with catchtime.catchtime():
+        query = OsVersion("Windows 11 Pro", "24H2", "10.0.26100.3194").query
+        query = CVEQuery("", "git", Version("1.23"))
         start = time.time()
-            # result = get_cves_by_query(cve_collection, query)
-            # print(result)
         cves = list(get_cves_by_query(cve_collection, query))
         print(type(cves), len(cves))
         end = time.time()
