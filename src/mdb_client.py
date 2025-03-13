@@ -3,7 +3,7 @@ import enum
 from typing import Callable, Generator, Iterable
 
 from loguru import logger
-from pymongo import MongoClient
+from pymongo import MongoClient, UpdateOne
 from pymongo.collection import Collection
 from pymongo.operations import ReplaceOne
 
@@ -41,6 +41,14 @@ def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
 
 
 def _initial_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
+    # replacments = (
+    #     InsertOne(
+    #         filter={"cve.CVE_data_meta.ID": cve["cve"]["CVE_data_meta"]["ID"]},
+    #         update=cve,
+    #         upsert=True,
+    #     )
+    #     for cve in cves
+    # )
     cves_collection.insert_many(cves)
     logger.info("Finished initial insertion")
 

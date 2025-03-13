@@ -65,10 +65,26 @@ def fetch_metafiles(
         min_year (int, optional): Start year to fetch for, inclusive. Defaults to NVD_MIN_YEAR.
         max_year (int, optional): End year to fetch for, inclusive. Defaults to datetime.today().year.
 
-    Returns:
+    Yields:
         Iterable[tuple[int, MetaFile]]: Iterable of tuples, year and meta file for said year
     """
-    return ((year, _fetch_metafile(year)) for year in range(min_year, max_year + 1))
+    yield from ((year, _fetch_metafile(year)) for year in range(min_year, max_year + 1))
+
+
+def fetch_cves(
+    min_year: int = NVD_MIN_YEAR, max_year: int = datetime.today().year
+) -> Iterable[tuple[int, Iterable[dict]]]:
+    """
+    Fetch CVEs for a range of years from NVD
+
+    Args:
+        min_year (int, optional): Start year to fetch for, inclusive. Defaults to NVD_MIN_YEAR.
+        max_year (int, optional): End year to fetch for, inclusive. Defaults to datetime.today().year.
+
+    Yields:
+        Iterable[tuple[int, dict]]: Iterable of tuples, year and cves for said year
+    """
+    yield from ((year, _fetch_cves(year)) for year in range(min_year, max_year + 1))
 
 
 # TODO Look over adding a custom class for checkpoint

@@ -35,12 +35,19 @@ def search(args: argparse.Namespace) -> None:
 
 def mirror(args: argparse.Namespace) -> None:
     with MongoDBClient() as mdb_client:
-        cve_collection = mdb_client["nvd_mirror"]["cves"]
-        meta_collection = mdb_client["nvd_mirror"]["meta"]
+        cve_collection = mdb_client["my_nvd_mirror"]["cves"]
+        meta_collection = mdb_client["my_nvd_mirror"]["meta"]
+        # if not args.sync:
+        #     cve_collection.create_index(
+        #         {"cve.description.description_data.value_text": "text"}
+        #     )
+        #     cve_collection.create_index({"configurations.nodes.cpe_match.cpe23Uri": 1})
+        #     cve_collection.create_index({"cve.CVE_data_meta.ID": 1}, unique=True)
+
         update_cves(
             cve_collection=cve_collection,
             meta_collection=meta_collection,
-            operation=UpdateOperation.INITIAL if args.initial else UpdateOperation.SYNC,
+            operation=UpdateOperation.SYNC if args.sync else UpdateOperation.INITIAL,
         )
         update_checkpoints(
             meta_collection=meta_collection,
@@ -59,12 +66,20 @@ def main() -> None:
     parser = argparse.ArgumentParser("yacs", description="Yet Another CVE Searcher")
     subparsers = parser.add_subparsers(dest="command")
     mirror_parser = subparsers.add_parser(MIRROR_COMMAND, help="Mirror NVD to MongoDB")
-    mirror_parser.add_argument("-s", "--sync", help="Sync running mirror with NVD.", action="store_true")
     mirror_parser.add_argument(
-        "-i", "--initial", help="Inital mirror install from NVD to MongoDB", action="store_true"
+        "-s", "--sync", help="Sync running mirror with NVD.", action="store_true"
     )
     mirror_parser.add_argument(
-        "--year-start", help="Start year range for mirror", default=NVD_MIN_YEAR, type=int
+        "-i",
+        "--initial",
+        help="Inital mirror install from NVD to MongoDB",
+        action="store_true",
+    )
+    mirror_parser.add_argument(
+        "--year-start",
+        help="Start year range for mirror",
+        default=NVD_MIN_YEAR,
+        type=int,
     )
     mirror_parser.add_argument(
         "--year-end", help="End year range for mirror", default=NVD_MAX_YEAR, type=int
