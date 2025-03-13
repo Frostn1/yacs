@@ -6,7 +6,7 @@ from typing import Iterable
 from loguru import logger
 from requests import get
 from orjson import loads as orjson_loads
-from src.nvd.nvd_structs import MetaFile
+from src.nvd.nvd_structs import CVE, MetaFile
 
 
 NVD_MIN_YEAR = 2002
@@ -32,7 +32,7 @@ def _fetch_metafile(year: int = NVD_MIN_YEAR) -> MetaFile:
     return MetaFile(**metadata)
 
 
-def _fetch_cves(year: int = NVD_MIN_YEAR) -> Iterable[dict]:
+def _fetch_cves(year: int = NVD_MIN_YEAR) -> Iterable[CVE]:
     """
     Fetches CVEs for a specific year from NVD
 
@@ -49,7 +49,7 @@ def _fetch_cves(year: int = NVD_MIN_YEAR) -> Iterable[dict]:
     logger.info(f"Fetching CVEs - {url}")
     response = get(url=url, timeout=60, stream=True)
     with GzipFile(fileobj=BytesIO(response.content)) as f:
-        yield from orjson_loads(f.read())["CVE_Items"]
+        yield from map(CVE, orjson_loads(f.read())["CVE_Items"])
 
 
 def fetch_metafiles(
@@ -70,7 +70,7 @@ def fetch_metafiles(
 
 def fetch_cves(
     min_year: int = NVD_MIN_YEAR, max_year: int = datetime.today().year
-) -> Iterable[tuple[int, Iterable[dict]]]:
+) -> Iterable[tuple[int, Iterable[CVE]]]:
     """
     Fetch CVEs for a range of years from NVD
 
@@ -79,6 +79,9 @@ def fetch_cves(
         max_year (int, optional): End year to fetch for, inclusive. Defaults to datetime.today().year.
 
     Yields:
-        Iterable[tuple[int, dict]]: Iterable of tuples, year and cves for said year
+        Iterable[tuple[int, CVE]]: Iterable of tuples, year and cves for said year
     """
     yield from ((year, _fetch_cves(year)) for year in range(min_year, max_year + 1))
+
+
+print(list(_fetch_cves(2002))[0])

@@ -6,7 +6,7 @@ from loguru import logger
 
 from src.cvequery import CVEQuery
 from src.mdb_client import MongoDBClient, UpdateOperation
-from src.mirror_nvd import NVD_MAX_YEAR, NVD_MIN_YEAR, update_checkpoints, update_cves
+from src.nvd.mirror_nvd import NVD_MAX_YEAR, NVD_MIN_YEAR, update_checkpoints, update_cves
 from packaging.version import Version
 
 from src.search_vulnerabilties import search_vulnerabilities
