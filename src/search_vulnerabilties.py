@@ -226,7 +226,9 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: _description_
     """
-    description = cve["cve"]["description"]["description_data"][0]["value"]
+    description = cve["cve"]["description"]["description_data"][0].get("value", "")
+    if not description:
+        return False
     regexes: dict[str, Callable[[list[Version], Version], bool]] = {
         # Between versions
         r"((v?\d\S*?)(\sthrough\s)(v?\d\S*?)(\s|$))|((version|versions)\s(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(between\s(version\s|versions\s)?(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(before\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?after\s(version\s|versions\s)?(v?\d\S*?)(\s|$))|(after\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?before\s(version\s|versions\s)?(v?\d\S*?)(\s|$))": _is_version_in_between,
@@ -248,10 +250,9 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
 
 
 def _validate_product_in_summary(cve: dict, query: CVEQuery) -> bool:
-    return (
-        bool(query.product)
-        and query.product in cve["cve"]["description"]["description_data"][0]["value"]
-    )
+    return bool(query.product) and query.product in cve["cve"]["description"][
+        "description_data"
+    ][0].get("value", "")
 
 
 def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:

@@ -1,5 +1,3 @@
-#!/usr/bin/python
-from tqdm import tqdm
 from collections import deque
 from datetime import datetime
 from loguru import logger
@@ -18,8 +16,6 @@ NVD_MIN_YEAR = 2002
 NVD_MAX_YEAR = datetime.today().year
 NVD_METAFILES_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.meta"
 NVD_CVES_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-{year}.json.gz"
-logger.remove()
-logger.add(lambda msg: tqdm.write(msg, end=""), colorize=True, level="INFO")
 
 
 def _fetch_metafile(year: int = NVD_MIN_YEAR) -> MetaFile:
@@ -126,7 +122,7 @@ def update_checkpoints(
     Args:
         meta_collection (Collection): Collection to update metas in
     """
-    deque(tqdm(
+    deque(
         meta_collection.update_one(
             {"type": "cve checkpoint", "feed": year},
             {"$set": vars(metafile) | {"feed": year}},
@@ -134,7 +130,7 @@ def update_checkpoints(
         )
         for year, metafile in fetch_metafiles(min_year, max_year)
         if logger.info(f"Updating checkpoint - {year}") or True
-    ))
+    )
 
 
 def _update_cves_by_year(
@@ -165,15 +161,15 @@ def update_cves_by_years(
         years (Iterable[int]): Years to update
         operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
     """
-    deque(tqdm(
+    deque(
         _update_cves_by_year(cve_collection, year, operation)
         for year in years
         if logger.info(f"Updating CVEs - {year}") or True
-    ))
+    )
 
 
 def update_cves(
-    cvs_collection: Collection,
+    cve_collection: Collection,
     meta_collection: Collection,
     operation: UpdateOperation = UpdateOperation.SYNC,
 ) -> None:
@@ -186,10 +182,7 @@ def update_cves(
         operation (UpdateOperation, optional): Operation to perform on DB. Defaults to UpdateOperation.SYNC.
     """
     update_cves_by_years(
-        cvs_collection,
+        cve_collection,
         (year for year, _ in fetch_cve_years_need_of_update(meta_collection)),
         operation,
     )
-
-# def setup_db():
-#     db.cves.createIndex({ "cve.description.description_data.value_text": "text" })

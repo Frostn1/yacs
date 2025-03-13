@@ -36,8 +36,8 @@ def _sync_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:
         )
         for cve in cves
     )
-    result = cves_collection.bulk_write(list(replacments))
-    logger.info(f"Finished synching - {result.bulk_api_result}")
+    cves_collection.bulk_write(list(replacments))
+    logger.info("Finished synching")
 
 
 def _initial_cves(cves_collection: Collection, cves: Iterable[dict]) -> None:

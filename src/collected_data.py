@@ -72,7 +72,7 @@ def main() -> None:
     logger.remove()
     logger.add(sys.stderr, level="INFO")
     with MongoDBClient() as mdb_client:
-        cve_collection = mdb_client["nvd_mirror"]["cves"]
+        cve_collection = mdb_client["my_nvd_mirror"]["cves"]
         # cve_collection.create_index({ "cve.description.description_data.value_text": "text" })
         # cve_collection.create_index({ "configurations.nodes.cpe_match.cpe23Uri": 1 })
         # cve_collection.create_index([("cve.CVE_data_meta.ID", 1)])
@@ -83,8 +83,8 @@ def main() -> None:
             [InstalledApplication("CrystalDiskMark 8.0.6", "8.0.6")],
         )
         query = CVEQuery("f5", "nginx", Version("1.18.0"))
-        query = OsVersion("Windows 11 Pro", "24H2", "10.0.26100.3194").query
-        query = CVEQuery("", "git", Version("1.23"))
+        # query = OsVersion("Windows 11 Pro", "24H2", "10.0.26100.3194").query
+        # query = CVEQuery("", "git", Version("1.23"))
         start = time.time()
         cves = list(get_cves_by_query(cve_collection, query))
         print(type(cves), len(cves))
