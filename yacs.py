@@ -22,7 +22,7 @@ def search(args: argparse.Namespace) -> None:
             args.vendor,
             args.product,
             Version(args.version),
-            args.dont_normalize_product,
+            not args.dont_normalize_product,
         )
         _, cves = search_vulnerabilities(cve_collection, query)
         cves = list(cves)
@@ -65,10 +65,10 @@ def main() -> None:
         "-i", "--initial", help="Inital mirror install from NVD to MongoDB", action="store_true"
     )
     mirror_parser.add_argument(
-        "--year-start", help="Start year range for mirror", default=NVD_MIN_YEAR
+        "--year-start", help="Start year range for mirror", default=NVD_MIN_YEAR, type=int
     )
     mirror_parser.add_argument(
-        "--year-end", help="End year range for mirror", default=NVD_MAX_YEAR
+        "--year-end", help="End year range for mirror", default=NVD_MAX_YEAR, type=int
     )
 
     search_parser = subparsers.add_parser(
@@ -80,7 +80,7 @@ def main() -> None:
     search_parser.add_argument(
         "--dont-normalize-product",
         help="Don't normalize product name when searching",
-        default=True,
+        default=False,
     )
     search_parser.add_argument(
         "--file",
