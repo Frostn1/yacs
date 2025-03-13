@@ -1,127 +1,69 @@
 from collections import deque
-from datetime import datetime
 from typing import Iterable
 
 from loguru import logger
 from pymongo.collection import Collection
-from pytz import UTC
 
-from src.mdb_client import UPDATE_OPERATIONS_MAP, UpdateOperation
-from src.nvd.nvd_structs import MetaFile
+from src.mdb_client import insert_cves_to_collection
 
-
-# TODO Look over adding a custom class for checkpoint
-def get_checkpoints(meta_collection: Collection) -> dict[int, datetime]:
-    """
-    Gets checkpoints for CVEs, i.e. to know when to update the cves DB
-
-    Args:
-        collection (Collection): Collection, usually under meta, that holds CVE checkpoints
-
-    Returns:
-        dict[int, datetime]: CVE Checkpoints
-    """
-    checkpoints = meta_collection.find(
-        {"type": "cve checkpoint"}, {"feed": 1, "lastModifiedDate": 1}
-    )
-    return {
-        checkpoint["feed"]: checkpoint["lastModifiedDate"] for checkpoint in checkpoints
-    }
+from src.nvd.nvd_api import (
+    NVD_MAX_YEAR,
+    NVD_MIN_YEAR,
+    _fetch_cves,
+    _fetch_metafile,
+)
+from src.nvd.utils import years_need_of_cve_update
 
 
-def fetch_cve_years_need_of_update(
+def download_metafiles(
     meta_collection: Collection,
-) -> Iterable[tuple[int, MetaFile]]:
-    """
-    Fetches CVE years that need to be updated
-
-    Args:
-        collection (Collection): Collection, usually under meta, that holds CVE checkpoints
-
-    Returns:
-        Iterable[tuple[int, MetaFile]]: Iterable of tuples, year and meta file for said year
-    """
-    checkpoints = get_checkpoints(meta_collection)
-    return (
-        (year, metafile)
-        for year, metafile in fetch_metafiles()
-        if year not in checkpoints.keys()
-        or metafile.lastModifiedDate > UTC.localize(checkpoints[year])
-    )
-
-
-def update_checkpoints(
-    meta_collection: Collection,
-    min_year: int = NVD_MIN_YEAR,
-    max_year: int = NVD_MAX_YEAR,
+    years_to_update: Iterable[int] = range(NVD_MIN_YEAR, NVD_MAX_YEAR + 1),
 ) -> None:
     """
     Update checkpoints for meta files
 
     Args:
         meta_collection (Collection): Collection to update metas in
+        years_to_update (Iterable[int]): Years to update
     """
     deque(
         meta_collection.update_one(
-            {"type": "cve checkpoint", "feed": year},
-            {"$set": vars(metafile) | {"feed": year}},
+            {"year": year},
+            {"$set": vars(_fetch_metafile(year)) | {"year": year}},
             upsert=True,
         )
-        for year, metafile in fetch_metafiles(min_year, max_year)
-        if logger.info(f"Updating checkpoint - {year}") or True
+        for year in years_to_update
+        if logger.info(f"Updating CVEs - {year}") or True
     )
 
 
-def _update_cves_by_year(
+def download_cves(
     cve_collection: Collection,
-    year: int,
-    operation: UpdateOperation = UpdateOperation.SYNC,
-) -> None:
-    """_summary_
-
-    Args:
-        cve_collection (Collection): _description_
-        year (int): _description_
-        operation (UpdateOperation, optional): _description_. Defaults to UpdateOperation.SYNC.
-    """
-    UPDATE_OPERATIONS_MAP.get(operation)(cve_collection, _fetch_cves(year))
-
-
-def update_cves_by_years(
-    cve_collection: Collection,
-    years: Iterable[int],
-    operation: UpdateOperation = UpdateOperation.SYNC,
+    years_to_update: Iterable[int] = range(NVD_MIN_YEAR, NVD_MAX_YEAR + 1),
 ) -> None:
     """
     Update CVEs by years
 
     Args:
         cve_collection (Collection): Collection to update CVEs in
-        years (Iterable[int]): Years to update
-        operation (UpdateOperation, optional):  Operation to perform in DB. Defaults to UpdateOperation.SYNC.
+        years_to_update (Iterable[int]): Years to update
     """
     deque(
-        _update_cves_by_year(cve_collection, year, operation)
-        for year in years
+        insert_cves_to_collection(cve_collection, _fetch_cves(year))
+        for year in years_to_update
         if logger.info(f"Updating CVEs - {year}") or True
     )
 
 
-def update_cves(
-    cve_collection: Collection,
-    meta_collection: Collection,
-    operation: UpdateOperation = UpdateOperation.SYNC,
+def smart_download_cves(
+    cve_collection: Collection, meta_collection: Collection
 ) -> None:
     """
-    Update all CVEs
+    Update CVEs by knowing which years had updates in NVD compared to local copy.
+    Then update only those ones.
 
     Args:
-        cvs_collection (Collection): Collection to update CVEs in
-        meta_collection (Collection): Collection to update metas in
-        operation (UpdateOperation, optional): Operation to perform on DB. Defaults to UpdateOperation.SYNC.
+        cve_collection (Collection): Collection to update CVEs in
+        meta_collection (Collection): Collection of meta files. i.e. know what data we have in local copy
     """
-    update_cves_by_years(
-        cve_collection,
-        (year for year, _ in fetch_cve_years_need_of_update(meta_collection)),
-        operation,
-    )
+    download_cves(cve_collection, years_need_of_cve_update(meta_collection))
