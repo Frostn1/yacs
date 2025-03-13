@@ -20,16 +20,15 @@ Ensure you have the following installed:
    pip install .
    ```
 
-## Features
-- **Search CVEs**: Look up vulnerabilities for specific products, vendors, and versions.
-- **Mirror NVD**: Download and update CVE data from the National Vulnerability Database into a local MongoDB.
-- **Flexible Querying**: Search with or without product normalization and filter by vendor and version.
-
 ## Usage
 ### Mirror NVD Data
 To mirror the NVD database to a local MongoDB instance:
 ```sh
-yacs mirror --initial
+python -m yacs mirror --initial
+```
+or using [uv](https://github.com/astral-sh/uv):
+```sh
+uv run python -m yacs mirror --initial
 ```
 Options:
 - `--initial`: Perform an initial mirror install from NVD to MongoDB.
@@ -40,7 +39,11 @@ Options:
 ### Search for CVEs
 To search for CVEs in the local mirror:
 ```sh
-yacs search <product> --vendor <vendor> --version <version>
+python -m yacs search <product> --vendor <vendor> --version <version>
+```
+or using uv:
+```sh
+uv run python -m yacs search <product> --vendor <vendor> --version <version>
 ```
 Options:
 - `<product>`: Product name to search for.
@@ -75,18 +78,35 @@ You can also search using a JSON file with an array of query objects. Each objec
 ```
 To use this file for searching, run:
 ```sh
-yacs search --file queries.json
+python -m yacs search --file queries.json
+```
+or using uv:
+```sh
+uv run python -m yacs search --file queries.json
 ```
 
 ### Example Searches
 #### Example 1: Search for a CVE by product and version
 ```sh
-yacs search firefox --version 89.0
+python -m yacs search firefox --version 89.0
+```
+or
+```sh
+uv run python -m yacs search firefox --version 89.0
 ```
 #### Example 2: Mirror NVD data from 2010 to 2025
 ```sh
-yacs mirror --year-start 2010 --year-end 2025
+python -m yacs mirror --year-start 2010 --year-end 2025
 ```
+or
+```sh
+uv run python -m yacs mirror --year-start 2010 --year-end 2025
+```
+
+## Features
+- **Search CVEs**: Look up vulnerabilities for specific products, vendors, and versions.
+- **Mirror NVD**: Download and update CVE data from the National Vulnerability Database into a local MongoDB.
+- **Flexible Querying**: Search with or without product normalization and filter by vendor and version.
 
 ## Contributing
 Contributions are welcome! Feel free to submit pull requests or report issues.

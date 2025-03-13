@@ -67,6 +67,22 @@ def extract_cpe_from_cve(cve: dict) -> Iterable[CPEMatch]:
     return None
 
 
+def extract_cpe_from_cve_per_product(cve: dict, product: str) -> Iterable[CPEMatch]:
+    """
+    Extracts CPE URI from CVE by product name
+
+    Args:
+        cve (dict): CVE to extract CPE URI from
+        product (str): Product name to filter
+
+    Yields:
+        CPE: CPE URI
+    """
+    yield from filter(
+        lambda cpematch: product in cpematch.cpe23Uri.product, extract_cpe_from_cve(cve)
+    )
+
+
 def is_application_name_in_cpe(application_name: str, cpe: Optional[CPE]) -> bool:
     return bool(cpe) and application_name == cpe.product
 

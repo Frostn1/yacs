@@ -27,7 +27,6 @@ def search(args: argparse.Namespace) -> None:
         _, cves = search_vulnerabilities(cve_collection, query)
         cves = list(cves)
         print(f"Query - {query} , Found {len(cves)} cves")
-        input()
         for cvematch in cves:
             logger.info(
                 f"Found CVE [Confidence {cvematch.get_raw_confidences}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"

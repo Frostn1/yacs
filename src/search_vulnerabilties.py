@@ -12,6 +12,7 @@ from src.cvequery import CVEQuery
 from src.mdb_client import MongoDBClient
 from src.utils import (
     extract_cpe_from_cve,
+    extract_cpe_from_cve_per_product,
     is_application_name_in_cpe,
     is_vendor_name_in_cpe,
 )
@@ -82,7 +83,10 @@ def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Is version in CPE vulnerable version range
     """
-    return any(cpe.is_inrange(query.version) for cpe in extract_cpe_from_cve(cve))
+    return any(
+        cpe.is_inrange(query.version)
+        for cpe in extract_cpe_from_cve_per_product(cve, query.product)
+    )
 
 
 def _validate_product_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
@@ -309,25 +313,3 @@ def search_vulnerabilities(
             for cve in get_cves_by_query(cves_collection, query)
         ),
     )
-
-
-def main() -> None:
-    logger.remove()
-    logger.add(sys.stderr, level="INFO")
-    with MongoDBClient() as mdb_client:
-        cve_collection = mdb_client["nvd_mirror"]["cves"]
-        query = CVEQuery(
-            "microsoft", "windows_11_24h2", Version("10.0.26100.1742"), False
-        )
-        for query, cves in search_vulnerabilities(cve_collection, [query]):
-            cves = list(cves)
-            print(f"Query - {query} , Found {len(cves)} cves")
-            input()
-            for cvematch in cves:
-                logger.info(
-                    f"Found CVE [Confidence {cvematch.get_raw_confidences}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
-                )
-
-
-if __name__ == "__main__":
-    main()
