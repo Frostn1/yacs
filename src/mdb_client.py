@@ -22,4 +22,4 @@ def MongoDBClient(
 
 def insert_cves_to_collection(cve_collection: Collection, cves: Iterable[dict]) -> None:
     cve_collection.insert_many(cves)
-    logger.info("Finished insertion")
+    logger.debug("Finished insertion")

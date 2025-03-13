@@ -33,7 +33,7 @@ def download_metafiles(
             upsert=True,
         )
         for year in years_to_update
-        if logger.info(f"Updating CVEs - {year}") or True
+        if logger.info(f"Downloading Meta File - {year}") or True
     )
 
 
@@ -51,7 +51,7 @@ def download_cves(
     deque(
         insert_cves_to_collection(cve_collection, _fetch_cves(year))
         for year in years_to_update
-        if logger.info(f"Updating CVEs - {year}") or True
+        if logger.info(f"Downloading CVEs - {year}") or True
     )
 
 
@@ -66,4 +66,14 @@ def smart_download_cves(
         cve_collection (Collection): Collection to update CVEs in
         meta_collection (Collection): Collection of meta files. i.e. know what data we have in local copy
     """
-    download_cves(cve_collection, years_need_of_cve_update(meta_collection))
+    need_of_update = list(years_need_of_cve_update(meta_collection))
+    download_cves(cve_collection, need_of_update)
+    download_metafiles(meta_collection, need_of_update)
+
+
+def setup_db(cve_collection: Collection, meta_collection: Collection) -> None:
+    cve_collection.create_index({"cve.description.description_data.value_text": "text"})
+    cve_collection.create_index({"configurations.nodes.cpe_match.cpe23Uri": 1})
+    cve_collection.create_index({"cve.CVE_data_meta.ID": 1}, unique=True)
+    download_metafiles(meta_collection)
+    download_cves(cve_collection)

@@ -26,7 +26,7 @@ def _fetch_metafile(year: int = NVD_MIN_YEAR) -> MetaFile:
         MetaFile: Meta data for said year
     """
     url = NVD_METAFILES_URL.format(year=year)
-    logger.info(f"Fetching meta file - {url}")
+    logger.debug(f"Fetching meta file - {url}")
     response = get(url=url)
     metadata = dict([i.split(":", maxsplit=1) for i in response.text.split()])
     return MetaFile(**metadata)
@@ -46,7 +46,7 @@ def _fetch_cves(year: int = NVD_MIN_YEAR) -> Iterable[dict]:
         Iterator[Iterable[dict]]: Iterable of all CVEs for said year
     """
     url = NVD_CVES_URL.format(year=year)
-    logger.info(f"Fetching CVEs - {url}")
+    logger.debug(f"Fetching CVEs - {url}")
     response = get(url=url, timeout=60, stream=True)
     with GzipFile(fileobj=BytesIO(response.content)) as f:
         yield from orjson_loads(f.read())["CVE_Items"]
