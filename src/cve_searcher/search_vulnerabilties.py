@@ -1,16 +1,14 @@
 from itertools import chain
 from re import Match, I as Insensitive, M as Multiline, findall, search
-import sys
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Iterator
 from loguru import logger
 from pymongo.collection import Collection
 from packaging.version import Version
-from src.confidence import Confidence
-from src.cpematch import is_version
-from src.cvematch import CVEMatch
-from src.cvequery import CVEQuery
-from src.mdb_client import MongoDBClient
-from src.utils import (
+from src.cve_searcher.confidence import Confidence
+from src.cve_searcher.cpematch import is_version
+from src.cve_searcher.cvematch import CVEMatch
+from src.cve_searcher.cvequery import CVEQuery
+from src.cve_searcher.utils import (
     extract_cpe_from_cve,
     extract_cpe_from_cve_per_product,
     is_application_name_in_cpe,
@@ -23,15 +21,25 @@ CHARS_TO_STRIP = r"!\"#$%&'()*+, -./:;<=>?@[\]^_`{|}~"
 VERSION_PREFIX = "vx"
 
 
-def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[dict]:
+def get_cves_by_query(cve_collection: Collection, query: CVEQuery) -> Iterable[dict]:
+    """
+    Get CVE's from cve_collection ( NVD copy ), by query which is product, and vendor
+
+    Args:
+        cve_collection (Collection): cve collection from NVD
+        query (CVEQuery): Query to search for
+
+    Returns:
+        Iterable[dict]: All cves found
+    """
     query = {
         "$or": [
-            # {
-            #     "$text": {
-            #         "$search": query.product,
-            #         "$caseSensitive": False,  # Optional: to make it case insensitive
-            #     }
-            # },
+            {
+                "$text": {
+                    "$search": query.product,
+                    "$caseSensitive": False,
+                }
+            },
             {
                 "configurations.nodes": {
                     "$elemMatch": {
@@ -41,13 +49,13 @@ def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[
                                     {
                                         "cpe23Uri": {
                                             "$regex": rf"^cpe:2\.3:\w:[^:]+:{query.product}:",
-                                            "$options": "si",  # Keep regex for the product/vendor in CPE
+                                            "$options": "si",
                                         }
                                     },
                                     {
                                         "cpe23Uri": {
                                             "$regex": rf"^cpe:2\.3:\w:{query.vendor}:",
-                                            "$options": "si",  # Keep regex for the vendor in CPE
+                                            "$options": "si",
                                         }
                                     },
                                 ]
@@ -60,16 +68,14 @@ def get_cves_by_query(cves_collection: Collection, query: CVEQuery) -> Iterable[
     }
 
     projections = {
-        "_id": 0,  # Exclude the MongoDB document _id
-        "cve.CVE_data_meta.ID": 1,  # Include CVE ID
-        "cve.description.description_data.value_text": 1,  # Include the description text
-        "configurations.nodes.cpe_match": 1,  # Include the entire CPE match data for validation
+        "_id": 0,
+        "cve.CVE_data_meta.ID": 1,
+        "cve.description.description_data.value_text": 1,
+        "configurations.nodes.cpe_match": 1,
     }
 
-    # count = cves_collection.count_documents(query)
     logger.debug(f"Query - {query}")
-    # logger.debug(f"Query - {count} documents")
-    return cves_collection.find(query, projections)
+    return cve_collection.find(query, projections)
 
 
 def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
@@ -84,7 +90,7 @@ def _validate_cpe_version(cve: dict, query: CVEQuery) -> bool:
         bool: Is version in CPE vulnerable version range
     """
     return any(
-        cpe.is_inrange(query.version)
+        query.version and cpe.is_inrange(query.version)
         for cpe in extract_cpe_from_cve_per_product(cve, query.product)
     )
 
@@ -158,7 +164,6 @@ def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
         )
     )
     return tuple(set(Version(version) for version in versions if is_version(version)))
-
 
 def _is_version_in_between(found_versions: list[Version], version: Version) -> bool:
     """
@@ -238,9 +243,9 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
         r"((v?\d\S*?)(\sthrough\s)(v?\d\S*?)(\s|$))|((version|versions)\s(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(between\s(version\s|versions\s)?(v?\d\S*?)\s(and|to|through)\s(v?\d\S*?)(\s|$))|(before\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?after\s(version\s|versions\s)?(v?\d\S*?)(\s|$))|(after\s(version\s|versions\s)?(v?\d\S*?)\s(and\s)?before\s(version\s|versions\s)?(v?\d\S*?)(\s|$))": _is_version_in_between,
         # Before versions
         r"(((versions\s)?(?!v?\d\S*?)(prior(\sto)?|before|below|through)\s(versions\s)?)(v?\d\S*?)(,(\s(and\s)?(v?\d\S*))+))|((((version\s|versions\s)?(?!v?\d\S*?)(prior(\sto)?|before|below|through)\s(version\s|versions\s)?)|(<(=)?\s+?))(v?\d\S*?)(\s|$)(?!and\safter))|(version|versions)?(\s(v?\d\S*?)\s(\()?and\s(below|prior|before|earlier)(\))?)": _is_version_before,
-        # # After versions
+        # After versions
         r"(?!and)\s((((after)\s(version\s|versions\s)?)|(>(=)?\s+?))(v?\d\S*?)(\s|$)(?!and))|(\s(v?\d\S?)\s(\()and\s(after|later)(\)))": _is_version_after,
-        # # Raw versions
+        # Raw versions
         r"(\s(version\s)?(v?\d\S*?)(\s|$)(?!and))": _is_version_in_versions,
     }
     for regex, validate_function in regexes.items():
@@ -248,7 +253,7 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
             findall(regex, description, flags=Insensitive | Multiline)
         )
 
-        if validate_function(versions, query.version):
+        if query.version is not None and validate_function(versions, query.version):
             return True
     return False
 
@@ -259,7 +264,7 @@ def _validate_product_in_summary(cve: dict, query: CVEQuery) -> bool:
     ][0].get("value", "")
 
 
-def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
+def create_cvematch(cve: dict, query: CVEQuery) -> CVEMatch:
     """
     Checks if CVE is legitimate for version,
 
@@ -285,31 +290,31 @@ def is_legitimate_cve(cve: dict, query: CVEQuery) -> CVEMatch:
         ),
         Confidence("Version is in Summary", _validate_version_in_summary, 0.3),
     ]
-
     return CVEMatch(cve, query, confidence)
 
 
 def search_vulnerabilities(
-    cves_collection: Collection,
+    cve_collection: Collection,
     query: CVEQuery,
     threshhold: float = 0.6,
-) -> tuple[CVEQuery, Iterable[CVEMatch]]:
+) -> Iterator[CVEMatch]:
     """
     Search for vulnerabilities in versions listed and using NVD mirror DB
 
     Args:
-        cves_collection (Collection): NVD Mirror DB to query against
-        queries (list[CVEQuery]): List of queries to perform
-        threshhold (float, optional): Confidence threshhold. Defaults to 0.75.
+        cve_collection (Collection): local cve collection
+        query (CVEQuery): Query to perform with parameters
+        threshhold (float, optional): Threshold of confidence. Defaults to 0.6.
 
-    Returns:
-        Iterable[CVEQuery, Iterable[tuple[float, dict]]]: Iterable of tuples, Query and Iterable of CVEMatches for that query
+
+
+    Yields:
+        Iterator[CVEMatch]: CVE Matches found
     """
-
-    return query, filter(
+    yield from filter(
         lambda cvematch: cvematch.confidence_score >= threshhold,
         (
-            is_legitimate_cve(cve, query)
-            for cve in get_cves_by_query(cves_collection, query)
+            create_cvematch(cve, query)
+            for cve in get_cves_by_query(cve_collection, query)
         ),
     )

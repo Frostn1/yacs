@@ -4,7 +4,7 @@ from itertools import chain
 from typing import Callable
 from loguru import logger
 
-from src.cvequery import CVEQuery
+from src.cve_searcher.cvequery import CVEQuery
 
 
 @dataclass
@@ -18,12 +18,11 @@ class Confidence:
         logger.debug(
             f"Validating {self.description} - {cve['cve']['CVE_data_meta']['ID']}"
         )
-        if cve['cve']['CVE_data_meta']['ID'] == 'CVE-2023-36404':
-            breakpoint()
 
         self.is_legitimate = self._validation_function(cve, query)
         return self.is_legitimate * sum(
             chain(
-                [self.weight], (sub.confidence_value(cve, query) for sub in self.sub_confidences)
+                [self.weight],
+                (sub.confidence_value(cve, query) for sub in self.sub_confidences),
             )
         )

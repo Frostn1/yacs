@@ -2,8 +2,8 @@ from dataclasses import dataclass
 from statistics import fmean
 from typing import Optional
 
-from src.confidence import Confidence
-from src.cvequery import CVEQuery
+from src.cve_searcher.confidence import Confidence
+from src.cve_searcher.cvequery import CVEQuery
 
 
 @dataclass
