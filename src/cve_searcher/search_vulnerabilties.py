@@ -12,6 +12,7 @@ from src.cve_searcher.utils import (
     extract_cpe_from_cve,
     extract_cpe_from_cve_per_product,
     is_application_name_in_cpe,
+    is_date,
     is_vendor_name_in_cpe,
 )
 
@@ -151,7 +152,7 @@ def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
             map(
                 lambda m: m.group().strip(CHARS_TO_STRIP + VERSION_PREFIX),
                 filter(
-                    lambda x: x,
+                    lambda x: x and not is_date(x),
                     map(
                         lambda group: search(
                             GENERIC_VERSION_REGEX, group, flags=Insensitive | Multiline

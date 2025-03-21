@@ -3,6 +3,7 @@ from packaging.version import Version
 from cpe_utils import CPE
 from re import sub
 from src.cve_searcher.cpematch import CPEMatch, is_version
+from dateutil.parser import parse
 
 APPNAME_ESCAPES_MAP: dict[str, str] = {
     r"!\"#$%&'()*+,-./:;<=>?@[\]^_`{|}~": r"\{char}",
@@ -99,3 +100,10 @@ def is_application_name_in_cpe(application_name: str, cpe: Optional[CPE]) -> boo
 
 def is_vendor_name_in_cpe(vendor_name: str, cpe: Optional[CPE]) -> bool:
     return (bool(cpe) and vendor_name.lower() == cpe.vendor) or not bool(vendor_name)
+
+def is_date(value: str) -> bool:
+    try:
+        parse(value)
+        return True
+    except ValueError:
+        return False
