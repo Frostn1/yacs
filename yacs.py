@@ -39,6 +39,7 @@ def mirror(_: argparse.Namespace) -> None:
         meta_collection = mdb_client.nvd_mirror.meta
         setup_db(cve_collection, meta_collection)
 
+
 ACTIONS = {SEARCH_COMMAND: search, MIRROR_COMMAND: mirror}
 
 
@@ -75,10 +76,8 @@ def main() -> None:
     if args.command is None:
         parser.print_help()
         exit(0)
-    
-    print(args)
-    
-    
+
+
     ACTIONS.get(args.command)(args)
 
 
