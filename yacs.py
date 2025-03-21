@@ -2,14 +2,14 @@
 import argparse
 import sys
 
+from cve_searcher.cvequery import CVEQuery
+from cve_searcher.search_vulnerabilties import search_vulnerabilities
 from loguru import logger
+from mongodb import MongoDBClient
 
-from src.cvequery import CVEQuery
-from src.mdb_client import MongoDBClient
 from src.nvd.mirror_nvd import NVD_MAX_YEAR, NVD_MIN_YEAR, setup_db
 from packaging.version import Version
 
-from src.search_vulnerabilties import search_vulnerabilities
 
 SEARCH_COMMAND = "search"
 MIRROR_COMMAND = "mirror"
@@ -24,13 +24,13 @@ def search(args: argparse.Namespace) -> None:
             Version(args.version),
             not args.dont_normalize_product,
         )
-        _, cves = search_vulnerabilities(cve_collection, query)
-        count: int
+        cves = search_vulnerabilities(cve_collection, query)
+        count: int = 0
         for count, cvematch in enumerate(cves):
             logger.info(
                 f"Found CVE [Confidence {cvematch.score}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
             )
-        print(f"Query - {query} , Found {count} cves")
+        print(f"Query - {query} , Found {count + 1} cves")
 
 
 def mirror(_: argparse.Namespace) -> None:
@@ -49,15 +49,6 @@ def main() -> None:
     parser = argparse.ArgumentParser("yacs", description="Yet Another CVE Searcher")
     subparsers = parser.add_subparsers(dest="command")
     mirror_parser = subparsers.add_parser(MIRROR_COMMAND, help="Mirror NVD to MongoDB")
-    mirror_parser.add_argument(
-        "-s", "--sync", help="Sync running mirror with NVD.", action="store_true"
-    )
-    mirror_parser.add_argument(
-        "-i",
-        "--initial",
-        help="Inital mirror install from NVD to MongoDB",
-        action="store_true",
-    )
     mirror_parser.add_argument(
         "--year-start",
         help="Start year range for mirror",

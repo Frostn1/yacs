@@ -76,6 +76,8 @@ def get_cves_by_query(cve_collection: Collection, query: CVEQuery) -> Iterable[d
     }
 
     logger.debug(f"Query - {query}")
+    if cve_collection.count_documents(query) == 0:
+        logger.warning("No CVE's found for query. Did you remember to setup the DB ?")
     return cve_collection.find(query, projections)
 
 
