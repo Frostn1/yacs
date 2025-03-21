@@ -71,10 +71,6 @@ def main() -> None:
         action="store_true",
         default=False,
     )
-    search_parser.add_argument(
-        "--file",
-        help="File coherting to README' described structure.\nOverrides cmdline parameters",
-    )
     args = parser.parse_args()
     if args.command is None:
         parser.print_help()
