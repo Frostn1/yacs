@@ -6,7 +6,7 @@ from loguru import logger
 
 from src.cvequery import CVEQuery
 from src.mdb_client import MongoDBClient
-from src.nvd.mirror_nvd import NVD_MAX_YEAR, NVD_MIN_YEAR
+from src.nvd.mirror_nvd import NVD_MAX_YEAR, NVD_MIN_YEAR, setup_db
 from packaging.version import Version
 
 from src.search_vulnerabilties import search_vulnerabilities
@@ -33,28 +33,11 @@ def search(args: argparse.Namespace) -> None:
             )
 
 
-def mirror(args: argparse.Namespace) -> None:
-    # with MongoDBClient() as mdb_client:
-    #     cve_collection = mdb_client["my_nvd_mirror"]["cves"]
-    #     meta_collection = mdb_client["my_nvd_mirror"]["meta"]
-    #     # if not args.sync:
-    #     # cve_collection.list_indexes()
-    #     #     cve_collection.create_index(
-    #     #         {"cve.description.description_data.value_text": "text"}
-    #     #     )
-    #     #     cve_collection.create_index({"configurations.nodes.cpe_match.cpe23Uri": 1})
-    #     #     cve_collection.create_index({"cve.CVE_data_meta.ID": 1}, unique=True)
-
-    #     update_cves(
-    #         cve_collection=cve_collection,
-    #         meta_collection=meta_collection,
-    #     )
-    #     update_checkpoints(
-    #         meta_collection=meta_collection,
-    #         min_year=args.year_start,
-    #         max_year=args.year_end,
-    #     )
-    pass
+def mirror(_: argparse.Namespace) -> None:
+    with MongoDBClient() as mdb_client:
+        cve_collection = mdb_client["nvd_mirror"]["cves"]
+        meta_collection = mdb_client["nvd_mirror"]["meta"]
+        setup_db(cve_collection, meta_collection)
 
 ACTIONS = {SEARCH_COMMAND: search, MIRROR_COMMAND: mirror}
 
@@ -105,7 +88,10 @@ def main() -> None:
     if args.command is None:
         parser.print_help()
         exit(0)
+    
     print(args)
+    
+    
     ACTIONS.get(args.command)(args)
 
 

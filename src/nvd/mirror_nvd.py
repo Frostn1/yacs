@@ -72,9 +72,20 @@ def smart_download_cves(
     download_metafiles(meta_collection, need_of_update)
 
 
+def try_create_index(collection: Collection, index: dict, **kwargs) -> None:
+    try:
+        collection.create_index(index, **kwargs)
+    except Exception:
+        logger.warning(
+            f"Failed to create index {index}. Does this index already exists ?"
+        )
+
+
 def setup_db(cve_collection: Collection, meta_collection: Collection) -> None:
-    cve_collection.create_index({"cve.description.description_data.value_text": "text"})
-    cve_collection.create_index({"configurations.nodes.cpe_match.cpe23Uri": 1})
-    cve_collection.create_index({"cve.CVE_data_meta.ID": 1}, unique=True)
+    try_create_index(
+        cve_collection, {"cve.description.description_data.value_text": "text"}
+    )
+    try_create_index(cve_collection, {"configurations.nodes.cpe_match.cpe23Uri": 1})
+    try_create_index(cve_collection, {"cve.CVE_data_meta.ID": 1}, unique=True)
     download_metafiles(meta_collection)
     download_cves(cve_collection)
