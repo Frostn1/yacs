@@ -17,7 +17,7 @@ MIRROR_COMMAND = "mirror"
 
 def search(args: argparse.Namespace) -> None:
     with MongoDBClient() as mdb_client:
-        cve_collection = mdb_client["ThreatMesh"]["cves"]
+        cve_collection = mdb_client.nvd_mirror.cves
         query = CVEQuery(
             args.vendor,
             args.product,
@@ -25,18 +25,18 @@ def search(args: argparse.Namespace) -> None:
             not args.dont_normalize_product,
         )
         _, cves = search_vulnerabilities(cve_collection, query)
-        cves = list(cves)
-        print(f"Query - {query} , Found {len(cves)} cves")
-        for cvematch in cves:
+        count: int
+        for count, cvematch in enumerate(cves):
             logger.info(
-                f"Found CVE [Confidence {cvematch.get_raw_confidences}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
+                f"Found CVE [Confidence {cvematch.score}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
             )
+        print(f"Query - {query} , Found {count} cves")
 
 
 def mirror(_: argparse.Namespace) -> None:
     with MongoDBClient() as mdb_client:
-        cve_collection = mdb_client["nvd_mirror"]["cves"]
-        meta_collection = mdb_client["nvd_mirror"]["meta"]
+        cve_collection = mdb_client.nvd_mirror.cves
+        meta_collection = mdb_client.nvd_mirror.meta
         setup_db(cve_collection, meta_collection)
 
 ACTIONS = {SEARCH_COMMAND: search, MIRROR_COMMAND: mirror}
