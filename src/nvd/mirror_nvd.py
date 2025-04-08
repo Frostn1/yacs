@@ -8,6 +8,7 @@ from pymongo.collection import Collection
 from src.mongodb import update_cves_in_collection
 from src.nvd.nvd_api import NVD_MAX_YEAR, NVD_MIN_YEAR, _fetch_cves, _fetch_metafile
 from src.nvd.utils import years_need_of_cve_update
+from rich.progress import track
 
 
 def download_metafiles(
@@ -22,13 +23,18 @@ def download_metafiles(
         years_to_update (Iterable[int]): Years to update
     """
     deque(
-        meta_collection.update_one(
-            {"year": year},
-            {"$set": asdict(_fetch_metafile(year)) | {"year": year}},
-            upsert=True,
+        track(
+            (
+                meta_collection.update_one(
+                    {"year": year},
+                    {"$set": asdict(_fetch_metafile(year)) | {"year": year}},
+                    upsert=True,
+                )
+                for year in years_to_update
+            ),
+            description="Downloading meta files.",
+            total=len(years_to_update),
         )
-        for year in years_to_update
-        if logger.info(f"Downloading Meta File - {year}") or True
     )
 
 
@@ -44,9 +50,14 @@ def download_cves(
         years_to_update (Iterable[int]): Years to update
     """
     deque(
-        update_cves_in_collection(cve_collection, _fetch_cves(year))
-        for year in years_to_update
-        if logger.info(f"Downloading CVEs - {year}") or True
+        track(
+            (
+                update_cves_in_collection(cve_collection, _fetch_cves(year))
+                for year in years_to_update
+            ),
+            description="Downloading CVEs.",
+            total=len(years_to_update),
+        )
     )
 
 

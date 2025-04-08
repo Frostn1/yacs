@@ -71,7 +71,7 @@ def get_cves_by_query(cve_collection: Collection, query: CVEQuery) -> Iterable[d
     projections = {
         "_id": 0,
         "cve.CVE_data_meta.ID": 1,
-        "cve.description.description_data.value_text": 1,
+        "cve.description.description_data.value": 1,
         "configurations.nodes.cpe_match": 1,
     }
 
