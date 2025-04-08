@@ -80,7 +80,7 @@ def main() -> None:
         action="store_true",
         default=False,
     )
-    interactive_parser = subparsers.add_parser(
+    _ = subparsers.add_parser(
         INTERACTIVE_COMMAND, help="Interactive mode using rich"
     )
     args = parser.parse_args()
@@ -93,7 +93,5 @@ def main() -> None:
 
 if __name__ == "__main__":
     logger.remove()
-
     logger.add(lambda m: console.print(m, end=""), colorize=True, level="INFO")
-
     main()

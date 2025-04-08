@@ -88,7 +88,7 @@ def try_create_index(collection: Collection, index: dict, **kwargs) -> None:
 
 def setup_db(cve_collection: Collection, meta_collection: Collection) -> None:
     try_create_index(
-        cve_collection, {"cve.description.description_data.value_text": "text"}
+        cve_collection, {"cve.description.description_data.value": "text"}
     )
     try_create_index(cve_collection, {"configurations.nodes.cpe_match.cpe23Uri": 1})
     try_create_index(cve_collection, {"cve.CVE_data_meta.ID": 1}, unique=True)

@@ -12,6 +12,7 @@ classifiers = [
 license = { file = "LICENSE" }
 
 dependencies = [
+    "cmd2>=2.5.11",
     "cpe-utils>=0.1.0",
     "loguru>=0.7.3",
     "orjson>=3.10.15",
