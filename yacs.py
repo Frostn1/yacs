@@ -37,7 +37,7 @@ def search(args: argparse.Namespace) -> None:
             logger.info(
                 f"Found CVE [Confidence {cvematch.score}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
             )
-        print(f"Query - {query} , Found {count + 1} cves")
+        print(f"Query - {query} {query.product} , Found {count + 1} cves")
 
 
 def mirror(_: argparse.Namespace) -> None:
@@ -80,9 +80,9 @@ def main() -> None:
         action="store_true",
         default=False,
     )
-    _ = subparsers.add_parser(
-        INTERACTIVE_COMMAND, help="Interactive mode using rich"
-    )
+    # _ = subparsers.add_parser(
+    #     INTERACTIVE_COMMAND, help="Interactive mode using rich"
+    # )
     args = parser.parse_args()
     if args.command is None:
         parser.print_help()

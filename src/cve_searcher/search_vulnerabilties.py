@@ -1,5 +1,5 @@
 from itertools import chain
-from re import Match, I as Insensitive, M as Multiline, findall, search
+from re import Match, I as Insensitive, M as Multiline, findall, match, search
 from typing import Callable, Iterable, Iterator
 from loguru import logger
 from pymongo.collection import Collection
@@ -11,7 +11,6 @@ from src.cve_searcher.cvequery import CVEQuery
 from src.cve_searcher.utils import (
     extract_cpe_from_cve,
     extract_cpe_from_cve_per_product,
-    is_application_name_in_cpe,
     is_date,
     is_vendor_name_in_cpe,
 )
@@ -109,12 +108,7 @@ def _validate_product_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: Whether or not app name is in CPE
     """
-    return any(
-        map(
-            lambda cpe: is_application_name_in_cpe(query.product, cpe.cpe23Uri),
-            extract_cpe_from_cve(cve),
-        )
-    )
+    return any(extract_cpe_from_cve_per_product(cve, query.product))
 
 
 def _validate_vendor_name_in_cpe(cve: dict, query: CVEQuery) -> bool:
@@ -154,7 +148,7 @@ def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
             map(
                 lambda m: m.group().strip(CHARS_TO_STRIP + VERSION_PREFIX),
                 filter(
-                    lambda x: x and not is_date(x),
+                    lambda x: x and not is_date(str(x)),
                     map(
                         lambda group: search(
                             GENERIC_VERSION_REGEX, group, flags=Insensitive | Multiline
@@ -167,6 +161,7 @@ def _extract_versions_from_regex(matches: list[Match]) -> tuple[Version, ...]:
         )
     )
     return tuple(set(Version(version) for version in versions if is_version(version)))
+
 
 def _is_version_in_between(found_versions: list[Version], version: Version) -> bool:
     """
@@ -238,7 +233,9 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
     Returns:
         bool: _description_
     """
-    description = cve["cve"]["description"]["description_data"][0].get("value", "")
+    description = (
+        cve["cve"]["description"]["description_data"][0].get("value", "").lower()
+    )
     if not description:
         return False
     regexes: dict[str, Callable[[list[Version], Version], bool]] = {
@@ -262,9 +259,14 @@ def _validate_version_in_summary(cve: dict, query: CVEQuery) -> bool:
 
 
 def _validate_product_in_summary(cve: dict, query: CVEQuery) -> bool:
-    return bool(query.product) and query.product in cve["cve"]["description"][
-        "description_data"
-    ][0].get("value", "")
+    return bool(
+        bool(query.product)
+        and match(
+            query.product,
+            cve["cve"]["description"]["description_data"][0].get("value", ""),
+            flags=Insensitive | Multiline,
+        )
+    )
 
 
 def create_cvematch(cve: dict, query: CVEQuery) -> CVEMatch:
@@ -293,7 +295,10 @@ def create_cvematch(cve: dict, query: CVEQuery) -> CVEMatch:
         ),
         Confidence("Version is in Summary", _validate_version_in_summary, 0.3),
     ]
-    return CVEMatch(cve, query, confidence)
+    x = CVEMatch(cve, query, confidence)
+    if cve["cve"]["CVE_data_meta"]["ID"] == "CVE-2020-15509":
+        breakpoint()
+    return x
 
 
 def search_vulnerabilities(

@@ -11,7 +11,7 @@ class CVEQuery:
     _product: str = ""
     version: Optional[Version] = None
     normalize_product: bool = True
-
+    
     @property
     def product(self) -> str:
         return (
