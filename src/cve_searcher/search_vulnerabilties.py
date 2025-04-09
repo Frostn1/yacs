@@ -295,10 +295,7 @@ def create_cvematch(cve: dict, query: CVEQuery) -> CVEMatch:
         ),
         Confidence("Version is in Summary", _validate_version_in_summary, 0.3),
     ]
-    x = CVEMatch(cve, query, confidence)
-    if cve["cve"]["CVE_data_meta"]["ID"] == "CVE-2020-15509":
-        breakpoint()
-    return x
+    return CVEMatch(cve, query, confidence)
 
 
 def search_vulnerabilities(

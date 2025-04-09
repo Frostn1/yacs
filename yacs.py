@@ -6,8 +6,10 @@ import sys
 
 from cve_searcher.cvequery import CVEQuery
 from cve_searcher.search_vulnerabilties import search_vulnerabilities
+from display.display import display_search
 from loguru import logger
 from mongodb import MongoDBClient
+from yacs_search import YACSSearch
 
 from src.nvd.mirror_nvd import NVD_MAX_YEAR, NVD_MIN_YEAR, setup_db
 from packaging.version import Version
@@ -32,12 +34,8 @@ def search(args: argparse.Namespace) -> None:
             not args.dont_normalize_product,
         )
         cves = search_vulnerabilities(cve_collection, query)
-        count: int = -1
-        for count, cvematch in enumerate(cves):
-            logger.info(
-                f"Found CVE [Confidence {cvematch.score}] - {query.version} {cvematch.cve['cve']['CVE_data_meta']['ID']}"
-            )
-        print(f"Query - {query} {query.product} , Found {count + 1} cves")
+        yacs_search = YACSSearch(query, cves)
+        display_search(yacs_search)
 
 
 def mirror(_: argparse.Namespace) -> None:
