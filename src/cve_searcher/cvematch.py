@@ -30,3 +30,24 @@ class CVEMatch:
                 for confidence in self.confidences
             ]
         return self.raw_confidences
+
+    def pretty_print(self) -> None:
+        """Pretty print the CVE match."""
+        print(
+            f"[Description] {self.cve['cve']['description']['description_data'][0]['value']}"
+        )
+        impact = self.cve.get("impact", {})
+        basemetric = impact.get("baseMetricV3", {}) or impact.get("baseMetricV2", {})
+        cvss = basemetric.get("cvssV3", {}) or basemetric.get("cvssV2", {})
+        if cvss.get("baseScore"):
+            print(f"[CVSS] {cvss.get('baseScore')}")
+        else:
+            print("[CVSS] Not available")
+
+        if basemetric.get("severity"):
+            print(f"[CVSS Severity] {basemetric.get('severity')}")
+        else:
+            print("[CVSS Severity] Not available")
+
+        print(f"[Published Date] {self.cve['publishedDate']}")
+        print(f"[Last Modified Date] {self.cve['lastModifiedDate']}")

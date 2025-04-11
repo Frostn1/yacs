@@ -1,12 +1,28 @@
 from src.yacs_search import YACSSearch
-from src.display.layout import MatchesLayout, QueryLayout, base_layout
-from rich.live import Live
 
 
 def display_search(search: YACSSearch) -> None:
-    layout = base_layout()
-    layout["main"]["query"].update(QueryLayout(search.query))
-    layout["main"]["matches"].update(MatchesLayout(search.matches))
-    with Live(layout, refresh_per_second=10, screen=True):
-        
-        input("Enter to quit")
+    """Display the search matches."""
+    print()
+    print(f'{'Now showing matches': ^100}')
+    print(f"[Vendor] {search.query.vendor}", end="\t")
+    print(f"[Product] {search.query._product}", end="\t")
+    print(f"[Version] {search.query.version}", end="\t")
+    print()
+
+    check = True
+    for match in search.matches:
+        if check:
+            command = input(
+                "Press enter to coninue... (q to quit, c to not stop after each cve): "
+            )
+        match command:
+            case "q":
+                break
+            case "c":
+                check = False
+        print()
+        print(f"{match.cve['cve']['CVE_data_meta']['ID']:=^100}")
+        print()
+        match.pretty_print()
+        print()

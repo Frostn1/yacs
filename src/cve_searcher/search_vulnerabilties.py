@@ -72,6 +72,9 @@ def get_cves_by_query(cve_collection: Collection, query: CVEQuery) -> Iterable[d
         "cve.CVE_data_meta.ID": 1,
         "cve.description.description_data.value": 1,
         "configurations.nodes.cpe_match": 1,
+        "impact": 1,
+        "lastModifiedDate": 1,
+        "publishedDate": 1,
     }
 
     logger.debug(f"Query - {query}")
